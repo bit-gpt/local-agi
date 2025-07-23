@@ -66,13 +66,13 @@ const PromptsGoalsSection = ({
         idPrefix="prompts_"
       />
 
-      <DynamicPromptForm
+      {/* <DynamicPromptForm
         prompts={formData.dynamicPrompts || []}
         onAddPrompt={onAddPrompt}
         onRemovePrompt={onRemovePrompt}
         onChange={handleDynamicPromptChange}
         fieldGroups={metadata?.dynamicPrompts || []}
-      />
+      /> */}
     </div>
   );
 };
