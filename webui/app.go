@@ -1983,8 +1983,6 @@ func validateActionFields(actionType string, config map[string]interface{}, acti
 		return validateSendMailFields(config, actionIndex)
 	case "shell-command":
 		return validateShellCommandFields(config, actionIndex)
-	case "custom":
-		return validateCustomActionFields(config, actionIndex)
 	// Actions with no required fields: scraper, wikipedia, browse, counter, call_agents
 	case "scraper", "wikipedia", "browse", "counter", "call_agents":
 		return nil
@@ -2091,17 +2089,6 @@ func validateSendMailFields(config map[string]interface{}, index int) error {
 func validateShellCommandFields(config map[string]interface{}, index int) error {
 	if privateKey, ok := config["privateKey"]; !ok || fmt.Sprintf("%v", privateKey) == "" {
 		return fmt.Errorf("action %d (shell-command): privateKey is required", index)
-	}
-	return nil
-}
-
-// validateCustomActionFields validates custom action fields
-func validateCustomActionFields(config map[string]interface{}, index int) error {
-	requiredFields := []string{"name", "code"}
-	for _, field := range requiredFields {
-		if value, ok := config[field]; !ok || fmt.Sprintf("%v", value) == "" {
-			return fmt.Errorf("action %d (custom): %s is required", index, field)
-		}
 	}
 	return nil
 }

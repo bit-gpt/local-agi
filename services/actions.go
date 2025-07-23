@@ -17,7 +17,6 @@ import (
 const (
 	// Actions
 	ActionSearch = "search"
-	ActionCustom = "custom"
 	// ActionBrowserAgentRunner             = "browser-agent-runner"
 	// ActionDeepResearchRunner             = "deep-research-runner"
 	ActionGithubIssueLabeler             = "github-issue-labeler"
@@ -54,7 +53,6 @@ const (
 
 var AvailableActions = []string{
 	ActionSearch,
-	ActionCustom,
 	ActionGithubIssueLabeler,
 	ActionGithubIssueOpener,
 	ActionGithubIssueEditor,
@@ -131,8 +129,6 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 	}
 
 	switch name {
-	case ActionCustom:
-		a, err = action.NewCustom(config, "")
 	case ActionGenerateImage:
 		a = actions.NewGenImage(config)
 	case ActionSearch:
@@ -332,11 +328,6 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "shell-command",
 			Label:  "Shell Command",
 			Fields: actions.ShellConfigMeta(),
-		},
-		{
-			Name:   "custom",
-			Label:  "Custom",
-			Fields: action.CustomConfigMeta(),
 		},
 		{
 			Name:   "scraper",
