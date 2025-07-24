@@ -10,6 +10,8 @@ import GroupCreate from "./pages/GroupCreate";
 import AgentStatus from "./pages/AgentStatus";
 import ImportAgent from "./pages/ImportAgent";
 import Usage from "./pages/Usage";
+import BinanceAuth from "./pages/BinanceAuth";
+import ChatPaymentDemo from "./pages/ChatPaymentDemo";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const BASE_URL = import.meta.env.BASE_URL || "/app";
@@ -93,6 +95,18 @@ export const router = createBrowserRouter(
           element: (
             <ProtectedRoute>
               <Usage />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "binance-auth",
+          element: <BinanceAuth />,
+        },
+        {
+          path: "chat-payment-demo",
+          element: (
+            <ProtectedRoute>
+              <ChatPaymentDemo />
             </ProtectedRoute>
           ),
         },

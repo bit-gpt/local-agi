@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 // Import form sections
 import BasicInfoSection from './agent-form-sections/BasicInfoSection';
@@ -12,6 +12,7 @@ import PromptsGoalsSection from './agent-form-sections/PromptsGoalsSection';
 import AdvancedSettingsSection from './agent-form-sections/AdvancedSettingsSection';
 import ExportSection from './agent-form-sections/ExportSection';
 import FiltersSection from './agent-form-sections/FiltersSection';
+import PaymentSettingsSection from './agent-form-sections/PaymentSettingsSection';
 
 const AgentForm = ({
   isEdit = false,
@@ -26,9 +27,26 @@ const AgentForm = ({
   id,
 }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [activeSection, setActiveSection] = useState(
     isGroupForm ? "model-section" : "basic-section"
   );
+
+  // Check if returning from Binance authorization and switch to payment section
+  useEffect(() => {
+    const authCode = searchParams.get('code');
+    const status = searchParams.get('status');
+    const error = searchParams.get('error');
+    
+    if (isEdit && (authCode || error)) {
+      // Switch to payment section when returning from authorization (success or error)
+      setActiveSection('payment-section');
+      
+      // Clear URL parameters after switching
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, [searchParams, isEdit]);
 
   // Handle input changes
   const handleInputChange = (e) => {
@@ -220,6 +238,15 @@ const AgentForm = ({
             <i className="fas fa-server"></i>
             MCP Servers
           </li>
+          {isEdit && (<li
+            className={`wizard-nav-item ${
+              activeSection === "payment-section" ? "active" : ""
+            }`}
+            onClick={() => handleSectionChange("payment-section")}
+          >
+            <i className="fas fa-credit-card"></i>
+            Payment Settings
+          </li>)}
           <li
             className={`wizard-nav-item ${
               activeSection === "memory-section" ? "active" : ""
@@ -329,6 +356,18 @@ const AgentForm = ({
                 handleMCPServerChange={handleMCPServerChange}
               />
             </div>
+
+            {isEdit && (<div
+              style={{
+                display: activeSection === "payment-section" ? "block" : "none",
+              }}
+            >
+              <PaymentSettingsSection
+                formData={formData}
+                handleInputChange={handleInputChange}
+                agentId={id}
+              />
+            </div>)}
 
             <div
               style={{
@@ -448,6 +487,18 @@ const AgentForm = ({
                 handleMCPServerChange={handleMCPServerChange}
               />
             </div>
+
+            {isEdit && (<div
+              style={{
+                display: activeSection === "payment-section" ? "block" : "none",
+              }}
+            >
+              <PaymentSettingsSection
+                formData={formData}
+                handleInputChange={handleInputChange}
+                agentId={id}
+              />
+            </div>)}
 
             <div
               style={{

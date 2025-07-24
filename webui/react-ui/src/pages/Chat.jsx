@@ -110,6 +110,9 @@ function Chat() {
     return observable?.completion?.error;
   };
 
+  const [paymentStatus, setPaymentStatus] = useState('pending'); // 'pending', 'processing', 'success'
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [injectedPayment, setInjectedPayment] = useState(false);
 
   // Fetch agent config on mount
   useEffect(() => {
@@ -185,6 +188,38 @@ function Chat() {
     clearError,
   } = useChat(id, agentConfig?.model, handleStatusCompleted);
 
+  // Add demo messages for screenshot if chat is empty (only once)
+  const [demoInjected, setDemoInjected] = useState(false);
+  useEffect(() => {
+    if (!demoInjected && messages.length === 0 && agentConfig) {
+      messages.push(
+        {
+          sender: 'user',
+          type: 'user',
+          content: 'Give me a detailed report on the most important AI model releases from the last 6 months, including their capabilities, benchmarks, and key differences.',
+          timestamp: new Date(Date.now() - 300000)
+        },
+        {
+          sender: 'agent',
+          type: 'agent',
+          content: 'I can help you with that! However, this advanced data analysis feature requires pro plan.',
+          timestamp: new Date(Date.now() - 240000)
+        },
+        {
+          sender: 'system',
+          type: 'system',
+          content: 'payment_required',
+          timestamp: new Date(Date.now() - 180000),
+          paymentDetails: {
+            service: 'Pro Plan',
+            price: '20',
+            currency: 'USDT',
+          }
+        }
+      );
+      setDemoInjected(true);
+    }
+  }, [messages, demoInjected, agentConfig]);
 
 
   // Clear status when we receive a new assistant message
@@ -197,6 +232,51 @@ function Chat() {
     }
   }, [messages]);
 
+  // Detect payment_required message
+  const paymentMessage = messages.find(
+    (msg) => (msg.type === 'system' || msg.sender === 'system') && msg.content === 'payment_required'
+  );
+
+  useEffect(() => {
+    if (paymentMessage && paymentStatus !== 'success') {
+      setShowPaymentModal(true);
+    } else {
+      setShowPaymentModal(false);
+    }
+  }, [paymentMessage, paymentStatus]);
+
+  // Payment handlers
+  const handlePayment = () => {
+    setPaymentStatus('processing');
+    setTimeout(() => {
+      setPaymentStatus('success');
+      setTimeout(() => setShowPaymentModal(false), 2000);
+    }, 3000);
+  };
+  const handleDeclinePayment = () => setShowPaymentModal(false);
+
+  // Inject payment_required message after user asks for 'analyze' (demo only)
+  useEffect(() => {
+    if (!injectedPayment && messages.length > 0) {
+      const last = messages[messages.length - 1];
+      if (last.sender === 'user' && /analyze/i.test(last.content)) {
+        // Only inject if not already present
+        if (!messages.some(m => (m.type === 'system' || m.sender === 'system') && m.content === 'payment_required')) {
+          messages.push({
+            sender: 'system',
+            type: 'system',
+            content: 'payment_required',
+            paymentDetails: {
+              service: 'Pro Plan',
+              price: '2.50',
+              currency: 'USDT',
+            }
+          });
+          setInjectedPayment(true);
+        }
+      }
+    }
+  }, [messages, injectedPayment]);
 
 
   useEffect(() => {
@@ -335,21 +415,110 @@ function Chat() {
                             </span>
                           </div>
                         ) : (
-                          <div
-                            style={{
-                              background: "transparent",
-                              color: "#222",
-                              padding: "12px 0",
-                              maxWidth: "70%",
-                              fontSize: "1rem",
-                              alignSelf: "flex-start",
-                              position: "relative",
-                            }}
-                          >
-                            <div className="markdown-content">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                          // Payment required card for system message
+                          msg.type === 'system' && msg.content === 'payment_required' ? (
+                            <div style={{
+                              background: '#fef3c7',
+                              border: '1px solid #fde68a',
+                              borderRadius: '16px',
+                              padding: '18px 20px',
+                              maxWidth: '70%',
+                              alignSelf: 'flex-start',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '8px',
+                              boxShadow: '0 2px 6px rgba(251,191,36,0.08)',
+                              minWidth: '320px'
+                            }}>
+                              <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px',
+                                marginBottom: '8px',
+                                fontWeight: 600,
+                                color: '#92400e',
+                                fontSize: '16px'
+                              }}>
+                                <span>💳</span>
+                                Payment Required
+                              </div>
+                              <div style={{ fontSize: '13px', color: '#78350f', marginBottom: 8 }}>
+                                This action requires a <b>{msg.paymentDetails?.service}</b>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 8 }}>
+                                <span style={{ fontWeight: 600, fontSize: '15px' }}>Amount:</span>
+                                <span style={{ fontWeight: 700, fontSize: '18px', color: '#1f2937', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  {msg.paymentDetails?.price} {msg.paymentDetails?.currency}
+                                </span>
+                              </div>
+                              {paymentStatus !== 'success' ? (
+                                <button
+                                  onClick={() => setShowPaymentModal(true)}
+                                  style={{
+                                    marginTop: 4,
+                                    padding: '10px 18px',
+                                    background: '#f0b90b',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    color: '#000',
+                                    fontSize: '15px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    width: 'max-content',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                                  }}
+                                >
+                                  <span style={{
+                                    background: '#000',
+                                    color: '#f0b90b',
+                                    width: '16px',
+                                    height: '16px',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '10px',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    B
+                                  </span>
+                                  Pay with Binance Pay
+                                </button>
+                              ) : (
+                                <span style={{
+                                  marginTop: 4,
+                                  background: '#10b981',
+                                  color: 'white',
+                                  borderRadius: '6px',
+                                  padding: '4px 10px',
+                                  fontWeight: 600,
+                                  fontSize: '13px',
+                                  alignSelf: 'flex-start'
+                                }}>
+                                  Payment completed
+                                </span>
+                              )}
                             </div>
-                          </div>
+                          ) : (
+                            <div
+                              style={{
+                                background: "transparent",
+                                color: "#222",
+                                padding: "12px 0",
+                                maxWidth: "70%",
+                                fontSize: "1rem",
+                                alignSelf: "flex-start",
+                                position: "relative",
+                              }}
+                            >
+                              <div className="markdown-content">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                              </div>
+                            </div>
+                          )
                         )
                       )
                     }
@@ -402,7 +571,215 @@ function Chat() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Chat Input */}
+          {/* Payment Modal Overlay */}
+          {showPaymentModal && paymentMessage && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000
+            }}>
+              <div style={{
+                background: 'white',
+                borderRadius: '12px',
+                padding: '32px',
+                width: '90%',
+                maxWidth: '480px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+              }}>
+                {paymentStatus === 'pending' && (
+                  <>
+                    <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                      <div style={{
+                        width: '64px',
+                        height: '64px',
+                        background: 'linear-gradient(135deg, #f0b90b 0%, #e6a50b 100%)',
+                        borderRadius: '50%',
+                        margin: '0 auto 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '24px'
+                      }}>
+                        💳
+                      </div>
+                      <h3 style={{
+                        fontSize: '20px',
+                        fontWeight: '600',
+                        color: '#1f2937',
+                        margin: '0 0 8px 0'
+                      }}>
+                        Premium Feature Payment
+                      </h3>
+                      <p style={{
+                        fontSize: '14px',
+                        color: '#6b7280',
+                        margin: 0
+                      }}>
+                        Complete payment to access this feature
+                      </p>
+                    </div>
+                    <div style={{
+                      background: '#f9fafb',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      marginBottom: '24px'
+                    }}>
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                          SERVICE
+                        </div>
+                        <div style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>
+                          {paymentMessage.paymentDetails?.service}
+                        </div>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        paddingTop: '12px',
+                        borderTop: '1px solid #e5e7eb'
+                      }}>
+                        <span style={{ fontSize: '14px', color: '#6b7280' }}>Total Amount:</span>
+                        <span style={{
+                          fontSize: '20px',
+                          fontWeight: '700',
+                          color: '#1f2937',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          {paymentMessage.paymentDetails?.price} {paymentMessage.paymentDetails?.currency}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <button
+                        onClick={handleDeclinePayment}
+                        style={{
+                          flex: 1,
+                          padding: '12px',
+                          background: '#f3f4f6',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '8px',
+                          color: '#6b7280',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handlePayment}
+                        style={{
+                          flex: 2,
+                          padding: '12px',
+                          background: '#f0b90b',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: '#000',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px'
+                        }}
+                      >
+                        <span style={{
+                          background: '#000',
+                          color: '#f0b90b',
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '10px',
+                          fontWeight: 'bold'
+                        }}>
+                          B
+                        </span>
+                        Pay with Binance Pay
+                      </button>
+                    </div>
+                  </>
+                )}
+                {paymentStatus === 'processing' && (
+                  <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      border: '4px solid #f3f4f6',
+                      borderTop: '4px solid #f0b90b',
+                      borderRadius: '50%',
+                      margin: '0 auto 24px',
+                      animation: 'spin 1s linear infinite'
+                    }}></div>
+                    <h3 style={{
+                      fontSize: '18px',
+                      fontWeight: '600',
+                      color: '#1f2937',
+                      marginBottom: '8px'
+                    }}>
+                      Processing Payment
+                    </h3>
+                    <p style={{
+                      fontSize: '14px',
+                      color: '#6b7280',
+                      margin: 0
+                    }}>
+                      Please wait while we process your payment via Binance Pay...
+                    </p>
+                  </div>
+                )}
+                {paymentStatus === 'success' && (
+                  <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                    <div style={{
+                      width: '64px',
+                      height: '64px',
+                      background: '#10b981',
+                      borderRadius: '50%',
+                      margin: '0 auto 24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '32px',
+                      color: 'white'
+                    }}>
+                      ✓
+                    </div>
+                    <h3 style={{
+                      fontSize: '18px',
+                      fontWeight: '600',
+                      color: '#1f2937',
+                      marginBottom: '8px'
+                    }}>
+                      Payment Successful!
+                    </h3>
+                    <p style={{
+                      fontSize: '14px',
+                      color: '#6b7280',
+                      margin: 0
+                    }}>
+                      Your premium feature is now available. The agent will continue processing your request.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Input Area */}
           <form
             onSubmit={handleSend}
             style={{ display: "flex", gap: 12, alignItems: "center" }}
@@ -417,7 +794,7 @@ function Chat() {
                   ? "Type your message..."
                   : "Connecting..."
               }
-              disabled={sending || !isConnected}
+              disabled={showPaymentModal || sending || !isConnected}
               style={{
                 flex: 1,
                 padding: "12px 16px",
@@ -425,7 +802,7 @@ function Chat() {
                 borderRadius: 8,
                 fontSize: "1rem",
                 background:
-                  sending || !isConnected
+                  showPaymentModal || sending || !isConnected
                     ? "#f3f4f6"
                     : "#fff",
                 color: "#222",
@@ -437,9 +814,7 @@ function Chat() {
               type="submit"
               className="action-btn"
               style={{ minWidth: 120 }}
-              disabled={
-                sending || !isConnected
-              }
+              disabled={showPaymentModal || sending || !isConnected}
             >
               <i className="fas fa-paper-plane"></i> Send
             </button>
@@ -448,12 +823,19 @@ function Chat() {
               className="action-btn"
               style={{ background: "#f6f8fa", color: "#222", minWidth: 120 }}
               onClick={clearChat}
-              disabled={sending || messages.length === 0}
+              disabled={showPaymentModal || sending || messages.length === 0}
             >
               <i className="fas fa-trash"></i> Clear Chat
             </button>
           </form>
         </div>
+        {/* CSS Animation */}
+        <style jsx>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     </div>
   );

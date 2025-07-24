@@ -8,3 +8,4 @@ export { default as PromptsGoalsSection } from "./PromptsGoalsSection";
 export { default as AdvancedSettingsSection } from "./AdvancedSettingsSection";
 export { default as FormNavSidebar } from "./FormNavSidebar";
 export { default as ExportSection } from "./ExportSection";
+export { default as PaymentSettingsSection } from "./PaymentSettingsSection";

@@ -102,110 +102,115 @@ function App() {
   return (
     <div className="app-container">
       {/* Navigation Menu */}
-      <nav className="main-nav">
-        <div className="container">
-          <div className="logo-container">
-            {/* Logo */}
-            <Link to="/" className="logo-link">
-              <div className="logo-image-container">
-                <img src="/app/logo_2.png" alt="Logo" className="logo-image" />
+      {/* Hide navigation on Binance auth page */}
+      {!location.pathname.includes('/binance-auth') && (
+        <>
+          <nav className="main-nav">
+            <div className="container">
+              <div className="logo-container">
+                {/* Logo */}
+                <Link to="/" className="logo-link">
+                  <div className="logo-image-container">
+                    <img src="/app/logo_2.png" alt="Logo" className="logo-image" />
+                  </div>
+                </Link>
               </div>
-            </Link>
-          </div>
 
-          <div className="nav-links">
-            {navItems.map((item) => (
-              <NavItem
-                key={item.to}
-                to={item.to}
-                icon={item.icon}
-                label={item.label}
-                authenticated={authenticated}
-                onLogin={login}
-                requiresAuth={item.requiresAuth}
-                isMobile={false}
-              />
-            ))}
-          </div>
+              <div className="nav-links">
+                {navItems.map((item) => (
+                  <NavItem
+                    key={item.to}
+                    to={item.to}
+                    icon={item.icon}
+                    label={item.label}
+                    authenticated={authenticated}
+                    onLogin={login}
+                    requiresAuth={item.requiresAuth}
+                    isMobile={false}
+                  />
+                ))}
+              </div>
 
-          <div className="user-actions">
-            {authenticated ? (
-              <button 
-                onClick={logout}
-                className="logout-btn"
-                title="Logout"
-              >
-                Logout
-              </button>
-            ) : (
-              <button 
-                onClick={login}
-                className="login-btn"
-                title="Login"
-              >
-                Log in
-              </button>
-            )}
-          </div>
-          <div className="nav-right-container mobile-only">
-           {
-            !authenticated && (
-              <button 
-                onClick={login}
-                className="login-btn"
-                title="Login"
-              >
-                Log in
-              </button>
-            )
-           }
-            <div className="mobile-menu-toggle" onClick={toggleMobileMenu}>
-              <i className="fas fa-bars"></i>
+              <div className="user-actions">
+                {authenticated ? (
+                  <button 
+                    onClick={logout}
+                    className="logout-btn"
+                    title="Logout"
+                  >
+                    Logout
+                  </button>
+                ) : (
+                  <button 
+                    onClick={login}
+                    className="login-btn"
+                    title="Login"
+                  >
+                    Log in
+                  </button>
+                )}
+              </div>
+              <div className="nav-right-container mobile-only">
+               {
+                !authenticated && (
+                  <button 
+                    onClick={login}
+                    className="login-btn"
+                    title="Login"
+                  >
+                    Log in
+                  </button>
+                )
+               }
+                <div className="mobile-menu-toggle" onClick={toggleMobileMenu}>
+                  <i className="fas fa-bars"></i>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      </nav>
+          </nav>
 
-      {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <div className="mobile-menu">
-          <ul className="mobile-nav-links">
-            {navItems.map((item) => (
-              <li key={item.to}>
-                <NavItem
-                  to={item.to}
-                  icon={item.icon}
-                  label={item.label}
-                  authenticated={authenticated}
-                  onLogin={login}
-                  requiresAuth={item.requiresAuth}
-                  isMobile={true}
-                  onClick={() => setMobileMenuOpen(false)}
-                />
-              </li>
-            ))}
-            <li>
-              {authenticated ? (
-                <button 
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    logout();
-                  }}
-                  className="mobile-nav-link logout-mobile"
-                >
-                  <svg className="nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                    <polyline points="16,17 21,12 16,7"/>
-                    <line x1="21" y1="12" x2="9" y2="12"/>
-                  </svg>
-                  Logout
-                </button>
-              ) : (
-                null
-              )}
-            </li>
-          </ul>
-        </div>
+          {/* Mobile Menu */}
+          {mobileMenuOpen && (
+            <div className="mobile-menu">
+              <ul className="mobile-nav-links">
+                {navItems.map((item) => (
+                  <li key={item.to}>
+                    <NavItem
+                      to={item.to}
+                      icon={item.icon}
+                      label={item.label}
+                      authenticated={authenticated}
+                      onLogin={login}
+                      requiresAuth={item.requiresAuth}
+                      isMobile={true}
+                      onClick={() => setMobileMenuOpen(false)}
+                    />
+                  </li>
+                ))}
+                <li>
+                  {authenticated ? (
+                    <button 
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        logout();
+                      }}
+                      className="mobile-nav-link logout-mobile"
+                    >
+                      <svg className="nav-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16,17 21,12 16,7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                      </svg>
+                      Logout
+                    </button>
+                  ) : (
+                    null
+                  )}
+                </li>
+              </ul>
+            </div>
+          )}
+        </>
       )}
 
       {/* Toast Notification */}

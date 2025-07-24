@@ -13,7 +13,8 @@ const FormNavSidebar = ({ activeSection, handleSectionChange }) => {
     { id: 'memory-section', icon: 'fas fa-memory', label: 'Memory Settings' },
     { id: 'model-section', icon: 'fas fa-robot', label: 'Model Settings' },
     { id: 'prompts-section', icon: 'fas fa-comment-alt', label: 'Prompts & Goals' },
-    { id: 'advanced-section', icon: 'fas fa-cogs', label: 'Advanced Settings' }
+    { id: 'advanced-section', icon: 'fas fa-cogs', label: 'Advanced Settings' },
+    { id: 'payment-section', icon: 'fas fa-credit-card', label: 'Payment Settings' }
   ];
 
   return (
