@@ -447,6 +447,12 @@ func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Failed to serialize config")
 		}
 		agent.Config = newConfigJSON
+
+		// Update agent name if it changed in the config
+		if agent.Name != newConfig.Name {
+			agent.Name = newConfig.Name
+		}
+
 		if err := db.DB.Save(&agent).Error; err != nil {
 			return errorJSONMessage(c, "Failed to update config in DB: "+err.Error())
 		}
