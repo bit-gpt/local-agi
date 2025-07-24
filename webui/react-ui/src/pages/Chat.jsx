@@ -202,7 +202,7 @@ function Chat() {
         {
           sender: 'agent',
           type: 'agent',
-          content: 'I can help you with that! However, this advanced data analysis feature requires pro plan.',
+          content: 'The New York Times, The Washington Post (WaPo), and other publications require a payment of USDT 0.50 each to access their articles. Would you like to proceed?',
           timestamp: new Date(Date.now() - 240000)
         },
         {
@@ -211,8 +211,8 @@ function Chat() {
           content: 'payment_required',
           timestamp: new Date(Date.now() - 180000),
           paymentDetails: {
-            service: 'Pro Plan',
-            price: '20',
+            service: 'Premium Feature',
+            price: '0.50',
             currency: 'USDT',
           }
         }
@@ -267,8 +267,8 @@ function Chat() {
             type: 'system',
             content: 'payment_required',
             paymentDetails: {
-              service: 'Pro Plan',
-              price: '2.50',
+              service: 'Premium Feature',
+              price: '0.50',
               currency: 'USDT',
             }
           });
