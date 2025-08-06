@@ -12,6 +12,7 @@ import PromptsGoalsSection from './agent-form-sections/PromptsGoalsSection';
 import AdvancedSettingsSection from './agent-form-sections/AdvancedSettingsSection';
 import ExportSection from './agent-form-sections/ExportSection';
 import FiltersSection from './agent-form-sections/FiltersSection';
+import ServerWalletsSection from './agent-form-sections/ServerWalletsSection';
 
 const AgentForm = ({
   isEdit = false,
@@ -247,18 +248,27 @@ const AgentForm = ({
             <i className="fas fa-cogs"></i>
             Advanced Settings
           </li>
+          {isEdit && formData.server_wallets_enabled && (
+            <li
+              className={`wizard-nav-item ${
+                activeSection === "server-wallets-section" ? "active" : ""
+              }`}
+              onClick={() => handleSectionChange("server-wallets-section")}
+            >
+              <i className="fas fa-wallet"></i>
+              Server Wallets
+            </li>
+          )}
           {isEdit && (
-            <>
-              <li
-                className={`wizard-nav-item ${
-                  activeSection === "export-section" ? "active" : ""
-                }`}
-                onClick={() => handleSectionChange("export-section")}
-              >
-                <i className="fas fa-file-export"></i>
-                Export Data
-              </li>
-            </>
+            <li
+              className={`wizard-nav-item ${
+                activeSection === "export-section" ? "active" : ""
+              }`}
+              onClick={() => handleSectionChange("export-section")}
+            >
+              <i className="fas fa-file-export"></i>
+              Export Data
+            </li>
           )}
         </ul>
       </div>
@@ -373,6 +383,14 @@ const AgentForm = ({
 
             {isEdit && (
               <>
+                <div
+                  style={{
+                    display:
+                      activeSection === "server-wallets-section" ? "block" : "none",
+                  }}
+                >
+                  <ServerWalletsSection fetchServerWallets={activeSection === "server-wallets-section"} agentId={id} />
+                </div>
                 <div
                   style={{
                     display:
@@ -492,6 +510,14 @@ const AgentForm = ({
 
             {isEdit && (
               <>
+                <div
+                  style={{
+                    display:
+                      activeSection === "server-wallets-section" ? "block" : "none",
+                  }}
+                >
+                 <ServerWalletsSection fetchServerWallets={activeSection === "server-wallets-section"} agentId={id} />
+                </div>
                 <div
                   style={{
                     display:

@@ -200,6 +200,7 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 
 	// New API endpoints for getting and updating agent configuration
 	webapp.Get("/api/agent/:id/config", app.RequireUser(), app.RequireActiveAgent(), app.GetAgentConfig())
+	webapp.Get("/api/agent/:id/server-wallets", app.RequireUser(), app.RequireActiveAgent(), app.GetAgentServerWallets())
 
 	webapp.Put("/api/agent/:id/config", app.RequireUser(), app.RequireActiveAgent(), app.RequireActiveStatusAgent(), app.UpdateAgentConfig())
 

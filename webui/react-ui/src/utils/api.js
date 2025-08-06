@@ -137,6 +137,14 @@ export const agentApi = {
     return metadata;
   },
 
+  // Get agent server wallets
+  getAgentServerWallets: async (name) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.agentServerWallets(name)), {
+      headers: API_CONFIG.headers,
+    });
+    return handleResponse(response);
+  },
+
   // Create a new agent
   createAgent: async (config) => {
     const response = await fetch(buildUrl(API_CONFIG.endpoints.createAgent), {

@@ -15,8 +15,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/mudler/LocalAGI/core/conversations"
+	"github.com/mudler/LocalAGI/core/serverwallet"
 	coreTypes "github.com/mudler/LocalAGI/core/types"
-	internalTypes "github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/db"
 	models "github.com/mudler/LocalAGI/dbmodels"
 	"github.com/mudler/LocalAGI/pkg/config"
@@ -61,7 +61,7 @@ type (
 		htmx      *htmx.HTMX
 		config    *Config
 		*fiber.App
-		sharedState *internalTypes.AgentSharedState
+		sharedState *coreTypes.AgentSharedState
 	}
 )
 
@@ -80,7 +80,7 @@ func NewApp(opts ...Option) *App {
 		htmx:        htmx.New(),
 		config:      config,
 		App:         webapp,
-		sharedState: internalTypes.NewAgentSharedState(5 * time.Minute),
+		sharedState: coreTypes.NewAgentSharedState(5 * time.Minute),
 	}
 
 	a.registerRoutes(webapp)
@@ -265,6 +265,24 @@ func (a *App) Start() func(c *fiber.Ctx) error {
 				return errorJSONMessage(c, "Failed to parse agent config: "+err.Error())
 			}
 
+			if config.ServerWallets == nil && os.Getenv("LOCALAGI_ENABLE_SERVER_WALLETS") == "true" {
+				walletsConfig, err := serverwallet.GenerateDefaultServerWalletsConfig()
+				if err != nil {
+					return errorJSONMessage(c, "Failed to create wallets: "+err.Error())
+				}
+				config.ServerWallets = walletsConfig
+
+				// Update the agent config in the database with the new wallets
+				configJSON, err := json.Marshal(config)
+				if err != nil {
+					return errorJSONMessage(c, "Failed to serialize config with wallets: "+err.Error())
+				}
+				agent.Config = configJSON
+				if err := db.DB.Save(&agent).Error; err != nil {
+					return errorJSONMessage(c, "Failed to update agent config in DB: "+err.Error())
+				}
+			}
+
 			// Create agent in memory
 			if err := pool.CreateAgent(agentId, &config); err != nil {
 				return errorJSONMessage(c, "Failed to create agent in memory: "+err.Error())
@@ -287,7 +305,6 @@ func (a *App) Start() func(c *fiber.Ctx) error {
 
 func (a *App) Create() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		// 1. Get user ID
 		userIDStr, ok := c.Locals("id").(string)
 		if !ok || userIDStr == "" {
 			return errorJSONMessage(c, "User ID missing")
@@ -298,23 +315,19 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Invalid user ID")
 		}
 
-		// 2. Parse request body into config
 		var config state.AgentConfig
 		if err := c.BodyParser(&config); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
 
-		// 3. Validate config fields
 		if err := validateAgentConfig(&config); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
 
-		// 4. Validate and set model
 		if err := validateModel(config.Model); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
 
-		// 4. Apply fallback values from env if fields are empty
 		if config.MultimodalModel == "" {
 			config.MultimodalModel = os.Getenv("LOCALAGI_MULTIMODAL_MODEL")
 		}
@@ -325,20 +338,19 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			config.LocalRAGAPIKey = os.Getenv("LOCALAGI_LOCALRAG_API_KEY")
 		}
 
-		// 5. Serialize the enriched config to JSON
+		if os.Getenv("LOCALAGI_ENABLE_SERVER_WALLETS") == "true" {
+			walletsConfig, err := serverwallet.GenerateDefaultServerWalletsConfig()
+			if err != nil {
+				return errorJSONMessage(c, "Failed to create wallets: "+err.Error())
+			}
+			config.ServerWallets = walletsConfig
+		}
+
 		configJSON, err := json.Marshal(config)
 		if err != nil {
 			return errorJSONMessage(c, "Failed to serialize config")
 		}
 
-		// Pretty print the config for debugging
-		prettyConfig, err := json.MarshalIndent(config, "", "  ")
-		if err != nil {
-			return errorJSONMessage(c, "Failed to pretty print config")
-		}
-		xlog.Debug("Creating agent with config", "config", string(prettyConfig))
-
-		// 6. Store config in DB
 		id := uuid.New()
 		agent := models.Agent{
 			ID:     id,
@@ -351,7 +363,6 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Failed to store agent: "+err.Error())
 		}
 
-		// 7. Ensure agent pool is initialized
 		var pool *state.AgentPool
 		if p, ok := a.UserPools[userIDStr]; ok {
 			pool = p
@@ -376,7 +387,7 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			}
 			a.UserPools[userIDStr] = pool
 		}
-		// 8. Register agent in the in-memory pool
+
 		if err := pool.CreateAgent(id.String(), &config); err != nil {
 			return errorJSONMessage(c, "Failed to initialize agent: "+err.Error())
 		}
@@ -385,16 +396,13 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 	}
 }
 
-// NEW FUNCTION: Get agent configuration
 func (a *App) GetAgentConfig() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		// 1. Get agent from context (set by RequireActiveAgent middleware)
 		agent, ok := c.Locals("agent").(*models.Agent)
 		if !ok || agent == nil {
 			return errorJSONMessage(c, "Agent not found in context")
 		}
 
-		// 2. Unmarshal config JSON
 		var config state.AgentConfig
 		if err := json.Unmarshal(agent.Config, &config); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -403,15 +411,123 @@ func (a *App) GetAgentConfig() func(c *fiber.Ctx) error {
 			})
 		}
 
-		// 3. Return the config
-		return c.JSON(config)
+		// Remove wallets from agent config response entirely
+		configBytes, err := json.Marshal(config)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":   "Failed to serialize config",
+				"success": false,
+			})
+		}
+
+		var configMap map[string]interface{}
+		if err := json.Unmarshal(configBytes, &configMap); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":   "Failed to parse config map",
+				"success": false,
+			})
+		}
+
+		// Remove wallets entirely from the config response
+		delete(configMap, "server_wallets")
+
+		if os.Getenv("LOCALAGI_ENABLE_SERVER_WALLETS") == "true" {
+			configMap["server_wallets_enabled"] = true
+		} else {
+			configMap["server_wallets_enabled"] = false
+		}
+
+		return c.JSON(configMap)
+	}
+}
+
+func (a *App) GetAgentServerWallets() func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		if os.Getenv("LOCALAGI_ENABLE_SERVER_WALLETS") != "true" {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error":   "Server wallets are not enabled",
+				"success": false,
+			})
+		}
+
+		agent, ok := c.Locals("agent").(*models.Agent)
+		if !ok || agent == nil {
+			return errorJSONMessage(c, "Agent not found in context")
+		}
+
+		var config state.AgentConfig
+		if err := json.Unmarshal(agent.Config, &config); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":   "Failed to parse agent config",
+				"success": false,
+			})
+		}
+
+		ctx := context.Background()
+		serverWalletResults := make([]map[string]interface{}, 0)
+
+		for _, serverWalletConfig := range config.ServerWallets {
+			serverWalletInfo := map[string]interface{}{
+				"type":    serverWalletConfig.Type,
+				"address": serverWalletConfig.Address,
+			}
+
+			serverWalletInstance, err := serverwallet.NewServerWallet(serverWalletConfig)
+			if err != nil {
+				serverWalletInfo["error"] = fmt.Sprintf("Failed to create server wallet: %v", err)
+				serverWalletResults = append(serverWalletResults, serverWalletInfo)
+				continue
+			}
+
+			nativeBalance, err := serverWalletInstance.GetBalance(ctx)
+			if err != nil {
+				serverWalletInfo["balance_error"] = fmt.Sprintf("Failed to get native balance: %v", err)
+			} else {
+				chainConfig := coreTypes.GetDefaultChainConfig(serverWalletInstance.GetWalletType())
+				nativeBalanceFormatted := serverwallet.FormatBalance(nativeBalance, chainConfig.Decimals)
+				serverWalletInfo["balance"] = nativeBalanceFormatted
+				serverWalletInfo["currency"] = chainConfig.Symbol
+			}
+
+			tokenBalances, err := serverWalletInstance.GetAllTokenBalances(ctx)
+			if err != nil {
+				serverWalletInfo["token_balances_error"] = fmt.Sprintf("Failed to get token balances: %v", err)
+			} else {
+				tokenBalanceArray := make([]map[string]interface{}, 0)
+				chainConfig := coreTypes.GetDefaultChainConfig(serverWalletInstance.GetWalletType())
+
+				for tokenSymbol, balance := range tokenBalances {
+					var tokenDecimals int = 18
+					for _, token := range chainConfig.SupportedTokens {
+						if token.Symbol == tokenSymbol {
+							tokenDecimals = token.Decimals
+							break
+						}
+					}
+
+					tokenBalanceFormatted := serverwallet.FormatBalance(balance, tokenDecimals)
+					tokenBalanceArray = append(tokenBalanceArray, map[string]interface{}{
+						"symbol":   tokenSymbol,
+						"currency": tokenSymbol,
+						"balance":  tokenBalanceFormatted,
+					})
+				}
+				serverWalletInfo["token_balances"] = tokenBalanceArray
+			}
+
+			serverWalletResults = append(serverWalletResults, serverWalletInfo)
+		}
+
+		return c.JSON(fiber.Map{
+			"server_wallets": serverWalletResults,
+			"success":        true,
+		})
 	}
 }
 
 // UpdateAgentConfig handles updating an agent's configuration
 func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		// 1. Get user ID and agent from context
 		userIDStr, ok := c.Locals("id").(string)
 		if !ok || userIDStr == "" {
 			return errorJSONMessage(c, "User ID missing")
@@ -424,31 +540,32 @@ func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 
 		agentId := agent.ID.String()
 
-		// 2. Parse new config
 		var newConfig state.AgentConfig
 		if err := c.BodyParser(&newConfig); err != nil {
 			xlog.Error("Error parsing agent config", "error", err)
 			return errorJSONMessage(c, "Invalid agent config: "+err.Error())
 		}
 
-		// 3. Validate config fields
 		if err := validateAgentConfig(&newConfig); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
 
-		// 4. Validate model
 		if err := validateModel(newConfig.Model); err != nil {
 			return errorJSONMessage(c, err.Error())
 		}
 
-		// 3. Update DB
+		var currentConfig state.AgentConfig
+		if err := json.Unmarshal(agent.Config, &currentConfig); err != nil {
+			return errorJSONMessage(c, "Failed to parse current agent config")
+		}
+		newConfig.ServerWallets = currentConfig.ServerWallets
+
 		newConfigJSON, err := json.Marshal(newConfig)
 		if err != nil {
 			return errorJSONMessage(c, "Failed to serialize config")
 		}
 		agent.Config = newConfigJSON
 
-		// Update agent name if it changed in the config
 		if agent.Name != newConfig.Name {
 			agent.Name = newConfig.Name
 		}
@@ -457,23 +574,18 @@ func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Failed to update config in DB: "+err.Error())
 		}
 
-		// 4. Reload in-memory agent if active
 		pool, ok := a.UserPools[userIDStr]
 		if ok {
-			// Remember if the agent was running before removal
 			wasRunning := false
 			if existingAgent := pool.GetAgent(agentId); existingAgent != nil {
 				wasRunning = !existingAgent.Paused()
 			}
 
 			if existingAgent := pool.GetAgent(agentId); existingAgent != nil {
-				// Stop the existing agent but keep the manager
 				existingAgent.Stop()
 
-				// Remove only the agent instance, not the manager
 				pool.RemoveAgentOnly(agentId)
 
-				// Create new agent with preserved manager
 				if err := pool.CreateAgentWithExistingManager(agentId, &newConfig, !wasRunning); err != nil {
 					xlog.Error("Failed to recreate agent in memory", "error", err)
 					return errorJSONMessage(c, "Agent config updated in DB but failed to reload in memory")
@@ -905,7 +1017,7 @@ func (a *App) GetActionDefinition() func(c *fiber.Ctx) error {
 		actionName := c.Params("name")
 
 		xlog.Debug("Executing action", "action", actionName, "config", payload.Config)
-		action, err := services.Action(actionName, "", payload.Config, pool, map[string]string{})
+		action, err := services.Action(actionName, "", payload.Config, pool, map[string]string{}, nil)
 		if err != nil {
 			xlog.Error("Error creating action", "error", err)
 			return errorJSONMessage(c, err.Error())
@@ -989,7 +1101,7 @@ func (a *App) ExecuteAction() func(c *fiber.Ctx) error {
 
 		// 5. Validate action params against schema
 		if payload.Params != nil {
-			action, err := services.Action(actionName, "", payload.Config, pool, map[string]string{})
+			action, err := services.Action(actionName, "", payload.Config, pool, map[string]string{}, nil)
 			if err != nil {
 				xlog.Error("Error creating action for validation", "error", err)
 				return errorJSONMessage(c, "Failed to create action for validation: "+err.Error())
@@ -1030,7 +1142,7 @@ func (a *App) ExecuteAction() func(c *fiber.Ctx) error {
 		}
 
 		xlog.Debug("Executing action", "action", actionName, "config", payload.Config, "params", payload.Params)
-		action, err := services.Action(actionName, "", payload.Config, pool, map[string]string{})
+		action, err := services.Action(actionName, "", payload.Config, pool, map[string]string{}, nil)
 
 		if err != nil {
 			// Update status to error
@@ -1374,6 +1486,14 @@ func (a *App) CreateGroup() func(c *fiber.Ctx) error {
 			}
 			if agentConfig.LocalRAGAPIKey == "" {
 				agentConfig.LocalRAGAPIKey = os.Getenv("LOCALAGI_LOCALRAG_API_KEY")
+			}
+
+			if os.Getenv("LOCALAGI_ENABLE_SERVER_WALLETS") == "true" {
+				walletsConfig, err := serverwallet.GenerateDefaultServerWalletsConfig()
+				if err != nil {
+					return errorJSONMessage(c, "Failed to create wallets: "+err.Error())
+				}
+				agentConfig.ServerWallets = walletsConfig
 			}
 
 			// 5. Serialize the enriched config to JSON
