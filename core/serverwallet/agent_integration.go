@@ -37,16 +37,40 @@ func GenerateDefaultServerWalletsConfig() ([]types.ServerWalletConfig, error) {
 
 	supportedTypes := GetSupportedServerWalletTypes()
 
-	for _, walletType := range supportedTypes {
-		serverWallet, err := GenerateNewServerWallet(walletType)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate server wallet for type %s: %v", walletType, err)
-		}
+	var evmPrivateKey string
+	var evmAddress string
+	var evmGenerated bool
 
-		config := types.ServerWalletConfig{
-			Type:       string(walletType),
-			Address:    serverWallet.GetAddress(),
-			PrivateKey: serverWallet.GetPrivateKey(),
+	for _, walletType := range supportedTypes {
+		var config types.ServerWalletConfig
+
+		if walletType == types.ServerWalletTypeBNB || walletType == types.ServerWalletTypeBASE {
+			if !evmGenerated {
+				evmWallet, err := GenerateNewServerWallet(walletType)
+				if err != nil {
+					return nil, fmt.Errorf("failed to generate EVM server wallet: %v", err)
+				}
+				evmPrivateKey = evmWallet.GetPrivateKey()
+				evmAddress = evmWallet.GetAddress()
+				evmGenerated = true
+			}
+
+			config = types.ServerWalletConfig{
+				Type:       string(walletType),
+				Address:    evmAddress,
+				PrivateKey: evmPrivateKey,
+			}
+		} else {
+			serverWallet, err := GenerateNewServerWallet(walletType)
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate server wallet for type %s: %v", walletType, err)
+			}
+
+			config = types.ServerWalletConfig{
+				Type:       string(walletType),
+				Address:    serverWallet.GetAddress(),
+				PrivateKey: serverWallet.GetPrivateKey(),
+			}
 		}
 
 		serverWalletConfigs = append(serverWalletConfigs, config)

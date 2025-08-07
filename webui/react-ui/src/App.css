@@ -2295,6 +2295,7 @@ a:hover {
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 1.5rem;
   margin-top: 1rem;
+  align-items: start;
 }
 
 .wallet-card {
@@ -2360,7 +2361,6 @@ a:hover {
 .wallet-address-short {
   font-size: 0.875rem;
   color: var(--text-light);
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
 }
 
 .wallet-info {
@@ -2420,6 +2420,15 @@ a:hover {
 
 .copy-btn i, .refresh-btn i {
   font-size: 0.8rem;
+}
+
+.private-key-container {
+  .copy-btn {
+    background-color: transparent;
+  }
+  .copy-btn i, .refresh-btn i {
+    font-size: 1rem;
+  }
 }
 
 @keyframes successPulse {
@@ -2563,4 +2572,156 @@ a:hover {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-left: 0.35rem;
+}
+
+/* Private Key Reveal Component */
+.private-key-reveal-section {
+  margin-top: 1.5rem;
+}
+
+.hold-to-reveal-btn {
+  width: 100%;
+  position: relative;
+  background: #f6f8fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.hold-to-reveal-btn:hover {
+  border-color: #d1d5da;
+  background: #f3f4f6;
+}
+
+.hold-to-reveal-btn.holding {
+  border-color: var(--warning);
+  background: #fff8e1;
+}
+
+.hold-to-reveal-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.hold-progress-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  border-radius: 0.5rem;
+}
+
+.hold-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+  transition: width 0.1s ease;
+  opacity: 0.3;
+}
+
+.hold-btn-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.hold-btn-content i {
+  font-size: 1.125rem;
+  color: var(--warning);
+}
+
+.hold-btn-content span {
+  font-size: 0.95rem;
+}
+
+/* Private Key Display */
+.private-key-section {
+  margin-top: 1.5rem;
+}
+
+.private-key-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  color: #dc2626;
+  font-size: 0.9rem;
+}
+
+.private-key-header i {
+  font-size: 1rem;
+  color: #dc2626;
+}
+
+.private-key-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: #ffffff;
+  border: 1px solid #e1e4e8;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  margin-bottom: 0.75rem;
+}
+
+.private-key-value {
+  flex: 1;
+  font-size: 0.875rem;
+  color: #24292e;
+  word-break: break-all;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-weight: 500;
+}
+
+.private-key-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  border-radius: 0.375rem;
+  font-size: 0.8rem;
+  color: #92400e;
+}
+
+.private-key-warning i {
+  font-size: 0.875rem;
+  color: #d97706;
+  flex-shrink: 0;
+}
+
+/* Animation for hold button */
+@keyframes pulse-warning {
+  0% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+}
+
+.hold-to-reveal-btn.holding {
+  animation: pulse-warning 1.5s infinite;
 }

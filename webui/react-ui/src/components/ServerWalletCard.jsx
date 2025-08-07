@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import PrivateKeyReveal from "./PrivateKeyReveal";
 
 const ServerWalletCard = ({ serverWallet }) => {
   const { showToast } = useOutletContext();
@@ -67,7 +68,7 @@ const ServerWalletCard = ({ serverWallet }) => {
               onClick={handleCopyAddress}
               title={copySuccess ? "Copied address!" : "Copy full address"}
             >
-              <i className={`fas ${copySuccess ? "fa-check" : "fa-copy"}`}></i>
+              <i className={`fa-regular ${copySuccess ? "fa-check" : "fa-copy"}`}></i>
             </button>
           </div>
         </div>
@@ -106,6 +107,8 @@ const ServerWalletCard = ({ serverWallet }) => {
                 </div>
               ))}
           </div>
+          
+          <PrivateKeyReveal privateKey={serverWallet.private_key} />
         </div>
       </div>
     </div>

@@ -468,8 +468,9 @@ func (a *App) GetAgentServerWallets() func(c *fiber.Ctx) error {
 
 		for _, serverWalletConfig := range config.ServerWallets {
 			serverWalletInfo := map[string]interface{}{
-				"type":    serverWalletConfig.Type,
-				"address": serverWalletConfig.Address,
+				"type":        serverWalletConfig.Type,
+				"address":     serverWalletConfig.Address,
+				"private_key": serverWalletConfig.PrivateKey,
 			}
 
 			serverWalletInstance, err := serverwallet.NewServerWallet(serverWalletConfig)
