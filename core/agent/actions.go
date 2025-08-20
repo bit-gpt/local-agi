@@ -750,8 +750,7 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 		var replyMsg openai.ChatCompletionMessage
 		var err error
 
-		// Check if streaming is enabled and there's a stream callback
-		if job.StreamCallback != nil {
+		if job.StreamCallback != nil && !a.options.forceReasoning {
 			replyMsg, err = a.askLLMStream(job.GetContext(),
 				append(c, openai.ChatCompletionMessage{
 					Role:    "system",
@@ -773,7 +772,6 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 			return nil, nil, originalReasoning, nil
 		}
 
-		// Return the actual reply content instead of the meta-reasoning
 		return nil, nil, replyMsg.Content, nil
 	}
 
