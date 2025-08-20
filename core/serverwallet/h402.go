@@ -524,7 +524,7 @@ func (h *H402Client) waitForPayment(ctx context.Context, payLimitError *PayLimit
 
 	fmt.Printf("Pay limit exceeded, set agent %s to payLimitStatus=WAITING, waiting for payment...\n", h.agentID)
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
 	ticker := time.NewTicker(2 * time.Second)
