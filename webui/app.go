@@ -338,9 +338,9 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			config.LocalRAGAPIKey = os.Getenv("LOCALAGI_LOCALRAG_API_KEY")
 		}
 
-		config.PayLimits = coreTypes.GetDefaultPayLimits()
-
 		if os.Getenv("LOCALAGI_ENABLE_SERVER_WALLETS") == "true" {
+			config.PayLimits = coreTypes.GetDefaultPayLimits()
+
 			walletsConfig, err := serverwallet.GenerateDefaultServerWalletsConfig()
 			if err != nil {
 				return errorJSONMessage(c, "Failed to create wallets: "+err.Error())
@@ -1002,19 +1002,15 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 		go func() {
 			var fullContent strings.Builder
 			agentMessageID := messageID + "-agent"
-			wasStreamed := false
-
 			// Stream callback to send partial responses
 			streamCallback := func(chunk string) {
-				wasStreamed = true
 				fullContent.WriteString(chunk)
 
 				// Send streaming chunk via SSE
 				send("json_message_chunk", map[string]interface{}{
 					"id":        agentMessageID,
 					"sender":    "agent",
-					"chunk":     chunk,
-					"content":   fullContent.String(), // Send accumulated content
+					"content":   fullContent.String(),
 					"createdAt": time.Now().Format(time.RFC3339),
 				})
 			}
@@ -1032,17 +1028,15 @@ func (a *App) Chat() func(c *fiber.Ctx) error {
 				return
 			}
 
-			// Only send final complete message if response was not streamed
-			if !wasStreamed {
-				send("json_message", map[string]interface{}{
-					"id":        agentMessageID,
-					"sender":    "agent",
-					"content":   response.Response,
-					"type":      "message",
-					"createdAt": time.Now().Format(time.RFC3339),
-					"final":     true, // Mark as final message
-				})
-			}
+			// Send final complete message for both streamed and non-streamed responses
+			send("json_message", map[string]interface{}{
+				"id":        agentMessageID,
+				"sender":    "agent",
+				"content":   response.Response,
+				"type":      "message",
+				"createdAt": time.Now().Format(time.RFC3339),
+				"final":     true, // Mark as final message to replace streaming content
+			})
 
 			// Save agent reply to DB
 			_ = db.DB.Create(&models.AgentMessage{
@@ -2748,6 +2742,18 @@ func (a *App) RequireActiveStatusAgent() func(c *fiber.Ctx) error {
 		}
 
 		// Agent is active and running, continue to handler
+		return c.Next()
+	}
+}
+
+func (a *App) RequireServerWalletsEnabled() func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		if os.Getenv("LOCALAGI_ENABLE_SERVER_WALLETS") != "true" {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"success": false,
+				"error":   "Server wallets are not enabled",
+			})
+		}
 		return c.Next()
 	}
 }
