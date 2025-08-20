@@ -479,14 +479,14 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, obs Obs
 		go c.Start(agent)
 	}
 
-	go func() {
-		for {
-			time.Sleep(1 * time.Second) // Send a message every seconds
-			manager.Send(sse.NewMessage(
-				utils.HTMLify(agent.State().String()),
-			).WithEvent("hud"))
-		}
-	}()
+	// go func() {
+	// 	for {
+	// 		time.Sleep(1 * time.Second) // Send a message every seconds
+	// 		manager.Send(sse.NewMessage(
+	// 			utils.HTMLify(agent.State().String()),
+	// 		).WithEvent("hud"))
+	// 	}
+	// }()
 
 	xlog.Info("Agent started", "id", id)
 

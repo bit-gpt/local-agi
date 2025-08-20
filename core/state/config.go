@@ -35,11 +35,13 @@ type FiltersConfig struct {
 }
 
 type AgentConfig struct {
-	Connector      []ConnectorConfig      `json:"connectors" form:"connectors" `
-	Actions        []ActionsConfig        `json:"actions" form:"actions"`
-	DynamicPrompts []DynamicPromptsConfig `json:"dynamic_prompts" form:"dynamic_prompts"`
-	MCPServers     []agent.MCPServer      `json:"mcp_servers" form:"mcp_servers"`
-	Filters        []FiltersConfig        `json:"filters" form:"filters"`
+	Connector      []ConnectorConfig          `json:"connectors" form:"connectors" `
+	Actions        []ActionsConfig            `json:"actions" form:"actions"`
+	DynamicPrompts []DynamicPromptsConfig     `json:"dynamic_prompts" form:"dynamic_prompts"`
+	MCPServers     []agent.MCPServer          `json:"mcp_servers" form:"mcp_servers"`
+	Filters        []FiltersConfig            `json:"filters" form:"filters"`
+	ServerWallets  []types.ServerWalletConfig `json:"server_wallets" form:"server_wallets"`
+	PayLimits      map[string]float64         `json:"pay_limits" form:"pay_limits"`
 
 	Description string `json:"description" form:"description"`
 

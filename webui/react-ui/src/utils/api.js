@@ -137,6 +137,14 @@ export const agentApi = {
     return metadata;
   },
 
+  // Get agent server wallets
+  getAgentServerWallets: async (name) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.agentServerWallets(name)), {
+      headers: API_CONFIG.headers,
+    });
+    return handleResponse(response);
+  },
+
   // Create a new agent
   createAgent: async (config) => {
     const response = await fetch(buildUrl(API_CONFIG.endpoints.createAgent), {
@@ -155,6 +163,32 @@ export const agentApi = {
         method: "PUT",
         headers: API_CONFIG.headers,
         body: JSON.stringify(config),
+      }
+    );
+    return handleResponse(response);
+  },
+
+  // Update an agent's pay limits
+  updateAgentPayLimits: async (name, payLimits) => {
+    const response = await fetch(
+      buildUrl(API_CONFIG.endpoints.agentPayLimits(name)),
+      {
+        method: "PUT",
+        headers: API_CONFIG.headers,
+        body: JSON.stringify({ pay_limits: payLimits }),
+      }
+    );
+    return handleResponse(response);
+  },
+
+  // Update an agent's pay limit status
+  updateAgentPayLimitStatus: async (name, payLimitStatus) => {
+    const response = await fetch(
+      buildUrl(API_CONFIG.endpoints.agentPayLimitStatus(name)),
+      {
+        method: "PUT",
+        headers: API_CONFIG.headers,
+        body: JSON.stringify({ pay_limit_status: payLimitStatus }),
       }
     );
     return handleResponse(response);

@@ -444,7 +444,7 @@ option {
     padding: 15px 20px;
     border-radius: 6px;
     box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
-    z-index: 2000;
+    z-index: 9999;
     opacity: 0;
     transform: translateX(30px);
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);

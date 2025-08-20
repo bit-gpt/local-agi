@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import "./App.css";
 import { usePrivy, useLogin, useLogout } from "@privy-io/react-auth";
@@ -209,7 +210,7 @@ function App() {
       )}
 
       {/* Toast Notification */}
-      {toast.visible && (
+      {toast.visible && createPortal(
         <div className={`toast ${toast.type}`}>
           <span>{toast.message}</span>
           <button
@@ -219,7 +220,8 @@ function App() {
           >
             ×
           </button>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Main Content Area */}

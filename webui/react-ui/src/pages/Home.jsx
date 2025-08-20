@@ -70,7 +70,7 @@ function Home() {
     };
 
     fetchData();
-  }, [ready, authenticated, showToast]);
+  }, [ready, authenticated]);
 
   if (!ready || loading) {
     return (

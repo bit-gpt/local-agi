@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/mudler/LocalAGI/core/action"
+	"github.com/mudler/LocalAGI/core/serverwallet"
 	"github.com/mudler/LocalAGI/core/state"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
@@ -90,37 +92,81 @@ var AvailableActions = []string{
 const (
 	// ActionConfigBrowserAgentRunner = "browser-agent-runner-base-url"
 	// ActionConfigDeepResearchRunner = "deep-research-runner-base-url"
-	ActionConfigSSHBoxURL = "sshbox-url"
+	ActionConfigSSHBoxURL                            = "sshbox-url"
+	ActionServerWalletEstimateTransactionFee         = "server-wallet-estimate-transaction-fee"
+	ActionServerWalletGetAddress                     = "server-wallet-get-address"
+	ActionServerWalletGetBalance                     = "server-wallet-get-balance"
+	ActionServerWalletGetAllBalances                 = "server-wallet-get-all-balances"
+	ActionServerWalletSendCrypto                     = "server-wallet-send-crypto"
+	ActionServerWalletWaitForTransactionConfirmation = "server-wallet-wait-for-transaction-confirmation"
 )
 
-func Actions(actionsConfigs map[string]string) func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
-	return func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
+func Actions(actionsConfigs map[string]string) func(ac *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
+	return func(ac *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
 		return func(ctx context.Context, pool *state.AgentPool) []types.Action {
 			allActions := []types.Action{}
 
-			agentName := a.Name
+			agentName := ac.Name
 
-			for _, a := range a.Actions {
+			for _, a := range ac.Actions {
 				var config map[string]string
 				if err := json.Unmarshal([]byte(a.Config), &config); err != nil {
 					xlog.Error("Error unmarshalling action config", "error", err)
 					continue
 				}
 
-				a, err := Action(a.Name, agentName, config, pool, actionsConfigs)
-				if err != nil {
-					continue
+				if os.Getenv("LOCALAGI_ENABLE_SERVER_WALLETS") == "true" && a.Name == ActionBrowse {
+					wallets, err := serverwallet.CreateServerWalletsFromConfig(ac.ServerWallets)
+					if err != nil {
+						xlog.Error("Error creating wallets", "error", err)
+						return allActions
+					}
+
+					action, err := Action(a.Name, agentName, map[string]string{}, pool, actionsConfigs, wallets, ac.PayLimits)
+					if err != nil {
+						continue
+					}
+					allActions = append(allActions, action)
+				} else {
+					a, err := Action(a.Name, agentName, config, pool, actionsConfigs, nil, nil)
+					if err != nil {
+						continue
+					}
+					allActions = append(allActions, a)
 				}
-				allActions = append(allActions, a)
+			}
+
+			if os.Getenv("LOCALAGI_ENABLE_SERVER_WALLETS") == "true" {
+				walletActions := []string{
+					ActionServerWalletEstimateTransactionFee,
+					ActionServerWalletGetAddress,
+					ActionServerWalletGetBalance,
+					ActionServerWalletGetAllBalances,
+					ActionServerWalletSendCrypto,
+					ActionServerWalletWaitForTransactionConfirmation,
+				}
+
+				wallets, err := serverwallet.CreateServerWalletsFromConfig(ac.ServerWallets)
+				if err != nil {
+					xlog.Error("Error creating wallets", "error", err)
+					return allActions
+				}
+
+				for _, walletAction := range walletActions {
+					a, err := Action(walletAction, agentName, map[string]string{}, pool, actionsConfigs, wallets, ac.PayLimits)
+					if err != nil {
+						continue
+					}
+					allActions = append(allActions, a)
+				}
 			}
 
 			return allActions
 		}
 	}
-
 }
 
-func Action(name, agentName string, config map[string]string, pool *state.AgentPool, actionsConfigs map[string]string) (types.Action, error) {
+func Action(name, agentName string, config map[string]string, pool *state.AgentPool, actionsConfigs map[string]string, wallets map[types.ServerWalletType]types.ServerWallet, payLimits map[string]float64) (types.Action, error) {
 	var a types.Action
 	var err error
 
@@ -176,7 +222,11 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 	case ActionWikipedia:
 		a = actions.NewWikipedia(config)
 	case ActionBrowse:
-		a = actions.NewBrowse(config)
+		if len(wallets) > 0 {
+			a = actions.NewBrowseWithWallets(config, wallets, payLimits, pool)
+		} else {
+			a = actions.NewBrowse(config)
+		}
 	case ActionSendMail:
 		a = actions.NewSendMail(config)
 	case ActionTwitterPost:
@@ -195,6 +245,18 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = action.NewListReminders()
 	case ActionRemoveReminder:
 		a = action.NewRemoveReminder()
+	case ActionServerWalletEstimateTransactionFee:
+		a = actions.NewEstimateTransactionFeeAction(wallets)
+	case ActionServerWalletGetAddress:
+		a = actions.NewGetServerWalletAddressAction(wallets)
+	case ActionServerWalletGetBalance:
+		a = actions.NewGetServerWalletBalanceAction(wallets)
+	case ActionServerWalletGetAllBalances:
+		a = actions.NewGetAllServerWalletBalancesAction(wallets)
+	case ActionServerWalletSendCrypto:
+		a = actions.NewSendCryptoAction(wallets)
+	case ActionServerWalletWaitForTransactionConfirmation:
+		a = actions.NewWaitForTransactionConfirmationAction(wallets)
 	default:
 		xlog.Error("Action not found", "name", name)
 		return nil, fmt.Errorf("Action not found")
