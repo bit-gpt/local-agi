@@ -205,6 +205,16 @@ func GetTransactionExplorerURL(serverWalletType ServerWalletType, txHash string)
 	}
 }
 
+func GetDefaultPayLimits() map[string]float64 {
+	return map[string]float64{
+		"ETH":  0.01,
+		"BNB":  0.1,
+		"SOL":  0.5,
+		"USDC": 50,
+		"USDT": 50,
+	}
+}
+
 type ServerWalletConfig struct {
 	Type       string `json:"type"`
 	Address    string `json:"address"`

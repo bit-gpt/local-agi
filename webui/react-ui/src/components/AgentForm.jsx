@@ -16,6 +16,7 @@ import ServerWalletsSection from './agent-form-sections/ServerWalletsSection';
 
 const AgentForm = ({
   isEdit = false,
+  agent,
   formData,
   setFormData,
   onSubmit,
@@ -25,6 +26,7 @@ const AgentForm = ({
   noFormWrapper = false,
   metadata = null,
   id,
+  setAgent,
 }) => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState(
@@ -389,7 +391,7 @@ const AgentForm = ({
                       activeSection === "server-wallets-section" ? "block" : "none",
                   }}
                 >
-                  <ServerWalletsSection fetchServerWallets={activeSection === "server-wallets-section"} agentId={id} />
+                  <ServerWalletsSection agent={agent} fetchServerWallets={activeSection === "server-wallets-section"} agentId={id} setAgent={setAgent} />
                 </div>
                 <div
                   style={{
@@ -516,7 +518,7 @@ const AgentForm = ({
                       activeSection === "server-wallets-section" ? "block" : "none",
                   }}
                 >
-                 <ServerWalletsSection fetchServerWallets={activeSection === "server-wallets-section"} agentId={id} />
+                 <ServerWalletsSection agent={agent} fetchServerWallets={activeSection === "server-wallets-section"} agentId={id} setAgent={setAgent} />
                 </div>
                 <div
                   style={{

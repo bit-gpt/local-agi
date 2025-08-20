@@ -4,10 +4,13 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
@@ -398,4 +401,142 @@ func (w *SolanaServerWallet) WaitForTransactionWithTimeout(ctx context.Context, 
 			}
 		}
 	}
+}
+
+func (w *SolanaServerWallet) CreatePaymentTransaction(ctx context.Context, paymentReq H402PaymentRequirement) (string, string, error) {
+	toPubkey, err := solana.PublicKeyFromBase58(paymentReq.PayToAddress)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid recipient address: %v", err)
+	}
+
+	var amountLamports uint64
+	if paymentReq.TokenAddress == "11111111111111111111111111111111" {
+		// Native SOL payment
+		if paymentReq.AmountRequiredFormat == "smallestUnit" {
+			// Amount is already in lamports
+			amountLamports = uint64(paymentReq.AmountRequired)
+		} else {
+			// Amount is in human-readable SOL, convert to lamports using precise arithmetic
+			amountFloat := new(big.Float).SetFloat64(paymentReq.AmountRequired)
+			lamportsPerSol := new(big.Float).SetInt(big.NewInt(1e9))
+			amountInLamports := new(big.Float).Mul(amountFloat, lamportsPerSol)
+			amountInt, _ := amountInLamports.Int(nil)
+			amountLamports = amountInt.Uint64()
+		}
+	} else {
+		// Token payment - get token decimals from chain config
+		chainConfig := coretypes.GetDefaultChainConfig(coretypes.ServerWalletTypeSOL)
+		decimals := 6 // Default to 6 decimals (common for USDC/USDT)
+		for _, token := range chainConfig.SupportedTokens {
+			if strings.EqualFold(token.Address, paymentReq.TokenAddress) {
+				decimals = token.Decimals
+				break
+			}
+		}
+
+		if paymentReq.AmountRequiredFormat == "smallestUnit" {
+			// Amount is already in smallest token units
+			amountLamports = uint64(paymentReq.AmountRequired)
+		} else {
+			// Amount is in human-readable token units, convert to smallest units using precise arithmetic
+			amountFloat := new(big.Float).SetFloat64(paymentReq.AmountRequired)
+			multiplier := new(big.Float).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil))
+			amountInTokens := new(big.Float).Mul(amountFloat, multiplier)
+			amountInt, _ := amountInTokens.Int(nil)
+			amountLamports = amountInt.Uint64()
+		}
+	}
+
+	recent, err := w.client.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get recent blockhash: %v", err)
+	}
+
+	var instructions []solana.Instruction
+
+	if paymentReq.TokenAddress == "11111111111111111111111111111111" {
+		instruction := system.NewTransferInstruction(
+			amountLamports,
+			w.publicKey,
+			toPubkey,
+		).Build()
+		instructions = append(instructions, instruction)
+	} else {
+		mintPubkey, err := solana.PublicKeyFromBase58(paymentReq.TokenAddress)
+		if err != nil {
+			return "", "", fmt.Errorf("invalid token mint address: %v", err)
+		}
+
+		sourceTokenAccount, _, err := solana.FindAssociatedTokenAddress(w.publicKey, mintPubkey)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to find source token account: %v", err)
+		}
+
+		destinationTokenAccount, _, err := solana.FindAssociatedTokenAddress(toPubkey, mintPubkey)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to find destination token account: %v", err)
+		}
+
+		_, err = w.client.GetAccountInfo(ctx, destinationTokenAccount)
+		accountExists := err == nil
+
+		if !accountExists {
+			createATAInstruction := associatedtokenaccount.NewCreateInstruction(
+				w.publicKey,
+				toPubkey,
+				mintPubkey,
+			).Build()
+			instructions = append(instructions, createATAInstruction)
+		}
+
+		transferInstruction := token.NewTransferInstruction(
+			amountLamports,
+			sourceTokenAccount,
+			destinationTokenAccount,
+			w.publicKey,
+			[]solana.PublicKey{},
+		).Build()
+		instructions = append(instructions, transferInstruction)
+	}
+
+	tx, err := solana.NewTransaction(
+		instructions,
+		recent.Value.Blockhash,
+		solana.TransactionPayer(w.publicKey),
+	)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create transaction: %v", err)
+	}
+
+	signatures, err := tx.Sign(func(key solana.PublicKey) *solana.PrivateKey {
+		if key.Equals(w.publicKey) {
+			return &w.privateKey
+		}
+		return nil
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("failed to sign transaction: %v", err)
+	}
+
+	txBytes, err := tx.MarshalBinary()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to marshal transaction: %v", err)
+	}
+	txBase64 := base64.StdEncoding.EncodeToString(txBytes)
+
+	if len(signatures) == 0 {
+		return "", "", fmt.Errorf("no signatures found")
+	}
+	signatureStr := signatures[0].String()
+
+	return txBase64, signatureStr, nil
+}
+
+func (w *SolanaServerWallet) GetH402Client() *H402Client {
+	return NewH402Client(w, w)
+}
+
+func (w *SolanaServerWallet) SendH402Request(ctx context.Context, method, url string, requestBody []byte) (*http.Response, error) {
+	client := w.GetH402Client()
+	return client.SendH402Request(ctx, method, url, requestBody)
 }

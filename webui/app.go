@@ -338,6 +338,8 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			config.LocalRAGAPIKey = os.Getenv("LOCALAGI_LOCALRAG_API_KEY")
 		}
 
+		config.PayLimits = coreTypes.GetDefaultPayLimits()
+
 		if os.Getenv("LOCALAGI_ENABLE_SERVER_WALLETS") == "true" {
 			walletsConfig, err := serverwallet.GenerateDefaultServerWalletsConfig()
 			if err != nil {
@@ -597,6 +599,109 @@ func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 
 		xlog.Info("Updated agent", "id", agentId)
 		return statusJSONMessage(c, "ok")
+	}
+}
+
+func (a *App) UpdateAgentPayLimits() func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		userIDStr, ok := c.Locals("id").(string)
+		if !ok || userIDStr == "" {
+			return errorJSONMessage(c, "User ID missing")
+		}
+
+		agent, ok := c.Locals("agent").(*models.Agent)
+		if !ok || agent == nil {
+			return errorJSONMessage(c, "Agent not found in context")
+		}
+
+		agentId := agent.ID.String()
+
+		var payLimitsRequest struct {
+			PayLimits map[string]float64 `json:"pay_limits"`
+		}
+
+		if err := c.BodyParser(&payLimitsRequest); err != nil {
+			xlog.Error("Error parsing pay limits", "error", err)
+			return errorJSONMessage(c, "Invalid pay limits format: "+err.Error())
+		}
+
+		if err := validatePayLimits(payLimitsRequest.PayLimits); err != nil {
+			return errorJSONMessage(c, err.Error())
+		}
+
+		var currentConfig state.AgentConfig
+		if err := json.Unmarshal(agent.Config, &currentConfig); err != nil {
+			return errorJSONMessage(c, "Failed to parse current agent config")
+		}
+
+		currentConfig.PayLimits = payLimitsRequest.PayLimits
+
+		newConfigJSON, err := json.Marshal(currentConfig)
+		if err != nil {
+			return errorJSONMessage(c, "Failed to serialize config")
+		}
+		agent.Config = newConfigJSON
+
+		if err := db.DB.Save(&agent).Error; err != nil {
+			return errorJSONMessage(c, "Failed to update pay limits in DB: "+err.Error())
+		}
+
+		pool, ok := a.UserPools[userIDStr]
+		if ok {
+			wasRunning := false
+			if existingAgent := pool.GetAgent(agentId); existingAgent != nil {
+				wasRunning = !existingAgent.Paused()
+				existingAgent.Stop()
+				pool.RemoveAgentOnly(agentId)
+
+				if err := pool.CreateAgentWithExistingManager(agentId, &currentConfig, !wasRunning); err != nil {
+					xlog.Error("Failed to recreate agent in memory with updated pay limits", "error", err)
+					return errorJSONMessage(c, "Pay limits updated in DB but failed to reload agent in memory")
+				}
+			}
+		}
+
+		xlog.Info("Updated agent pay limits", "id", agentId, "pay_limits", payLimitsRequest.PayLimits)
+		return statusJSONMessage(c, "ok")
+	}
+}
+
+func (a *App) UpdateAgentPayLimitStatus() func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		userIDStr, ok := c.Locals("id").(string)
+		if !ok || userIDStr == "" {
+			return errorJSONMessage(c, "User ID missing")
+		}
+
+		agent, ok := c.Locals("agent").(*models.Agent)
+		if !ok || agent == nil {
+			return errorJSONMessage(c, "Agent not found in context")
+		}
+
+		var requestBody struct {
+			PayLimitStatus string `json:"pay_limit_status"`
+		}
+
+		if err := c.BodyParser(&requestBody); err != nil {
+			return errorJSONMessage(c, "Invalid request body: "+err.Error())
+		}
+
+		if requestBody.PayLimitStatus != "APPROVED" && requestBody.PayLimitStatus != "CANCELLED" {
+			return errorJSONMessage(c, "Invalid pay_limit_status. Must be either 'APPROVED' or 'CANCELLED'")
+		}
+
+		agentId := agent.ID.String()
+
+		if err := db.DB.Model(&models.Agent{}).Where("id = ?", agent.ID).Update("payLimitStatus", requestBody.PayLimitStatus).Error; err != nil {
+			return errorJSONMessage(c, "Failed to update pay limit status in DB: "+err.Error())
+		}
+
+		xlog.Info("Updated agent pay limit status", "id", agentId, "status", requestBody.PayLimitStatus)
+		return c.JSON(fiber.Map{
+			"success":        true,
+			"message":        "Pay limit status updated successfully",
+			"payLimitStatus": requestBody.PayLimitStatus,
+		})
 	}
 }
 
@@ -1018,7 +1123,7 @@ func (a *App) GetActionDefinition() func(c *fiber.Ctx) error {
 		actionName := c.Params("name")
 
 		xlog.Debug("Executing action", "action", actionName, "config", payload.Config)
-		action, err := services.Action(actionName, "", payload.Config, pool, map[string]string{}, nil)
+		action, err := services.Action(actionName, "", payload.Config, pool, map[string]string{}, nil, nil)
 		if err != nil {
 			xlog.Error("Error creating action", "error", err)
 			return errorJSONMessage(c, err.Error())
@@ -1102,7 +1207,7 @@ func (a *App) ExecuteAction() func(c *fiber.Ctx) error {
 
 		// 5. Validate action params against schema
 		if payload.Params != nil {
-			action, err := services.Action(actionName, "", payload.Config, pool, map[string]string{}, nil)
+			action, err := services.Action(actionName, "", payload.Config, pool, map[string]string{}, nil, nil)
 			if err != nil {
 				xlog.Error("Error creating action for validation", "error", err)
 				return errorJSONMessage(c, "Failed to create action for validation: "+err.Error())
@@ -1143,7 +1248,7 @@ func (a *App) ExecuteAction() func(c *fiber.Ctx) error {
 		}
 
 		xlog.Debug("Executing action", "action", actionName, "config", payload.Config, "params", payload.Params)
-		action, err := services.Action(actionName, "", payload.Config, pool, map[string]string{}, nil)
+		action, err := services.Action(actionName, "", payload.Config, pool, map[string]string{}, nil, nil)
 
 		if err != nil {
 			// Update status to error
@@ -1691,6 +1796,46 @@ func validateModel(model string) error {
 	}
 
 	return fmt.Errorf("model '%s' is not available. Please choose from available models", model)
+}
+
+func validatePayLimits(payLimits map[string]float64) error {
+	if payLimits == nil {
+		return nil
+	}
+
+	type tokenLimit struct {
+		min float64
+		max float64
+	}
+
+	tokenLimits := map[string]tokenLimit{
+		"ETH":  {min: 0.0001, max: 0.02},
+		"BNB":  {min: 0.0001, max: 0.2},
+		"SOL":  {min: 0.0001, max: 1},
+		"USDC": {min: 0.1, max: 100},
+		"USDT": {min: 0.1, max: 100},
+	}
+
+	for token, limit := range payLimits {
+		tokenLimitInfo, supported := tokenLimits[token]
+		if !supported {
+			return fmt.Errorf("unsupported token '%s'. Supported tokens are: ETH, BNB, SOL, USDC, USDT", token)
+		}
+
+		if limit < 0 {
+			return fmt.Errorf("pay limit for token '%s' cannot be negative", token)
+		}
+
+		if limit > 0 && limit < tokenLimitInfo.min {
+			return fmt.Errorf("pay limit for token '%s' is too low (minimum %.3f)", token, tokenLimitInfo.min)
+		}
+
+		if limit > tokenLimitInfo.max {
+			return fmt.Errorf("pay limit for token '%s' is too high (maximum %.2f)", token, tokenLimitInfo.max)
+		}
+	}
+
+	return nil
 }
 
 // validateAgentConfig validates all agent configuration fields

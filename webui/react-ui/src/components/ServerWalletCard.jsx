@@ -24,6 +24,13 @@ const ServerWalletCard = ({ serverWallet }) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
+  const truncateBalance = (balance) => {
+    if (!balance) return "0";
+    const num = parseFloat(balance);
+    if (isNaN(num)) return balance;
+    return num.toFixed(6);
+  };
+
   const renderTokenIcon = (currency) => {
     return (
       <div className={`token-icon-container ${currency.toLowerCase()}`}>
@@ -86,7 +93,7 @@ const ServerWalletCard = ({ serverWallet }) => {
                   {getTokenName(serverWallet.currency)}
                 </span>
               </div>
-              <span className="token-balance">{serverWallet.balance}</span>
+              <span className="token-balance">{truncateBalance(serverWallet.balance)}</span>
               <span className="token-balance-currency">{serverWallet.currency}</span>
             </div>
 
@@ -100,7 +107,7 @@ const ServerWalletCard = ({ serverWallet }) => {
                       {getTokenName(token.currency)}
                     </span>
                   </div>
-                  <span className="token-balance">{token.balance}</span>
+                  <span className="token-balance">{truncateBalance(token.balance)}</span>
                   <span className="token-balance-currency">
                     {token.currency}
                   </span>

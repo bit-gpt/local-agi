@@ -136,12 +136,14 @@ function AgentSettings() {
           {metadata && formData ? (
             <AgentForm
               isEdit
+              agent={agent}
               formData={formData}
               setFormData={setFormData}
               onSubmit={updateAgent}
               loading={loading}
               submitButtonText="Save Changes"
               metadata={metadata}
+              setAgent={setAgent}
               id={id}
             />
           ) : (

@@ -101,25 +101,39 @@ const (
 	ActionServerWalletWaitForTransactionConfirmation = "server-wallet-wait-for-transaction-confirmation"
 )
 
-func Actions(actionsConfigs map[string]string) func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
-	return func(a *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
+func Actions(actionsConfigs map[string]string) func(ac *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
+	return func(ac *state.AgentConfig) func(ctx context.Context, pool *state.AgentPool) []types.Action {
 		return func(ctx context.Context, pool *state.AgentPool) []types.Action {
 			allActions := []types.Action{}
 
-			agentName := a.Name
+			agentName := ac.Name
 
-			for _, a := range a.Actions {
+			for _, a := range ac.Actions {
 				var config map[string]string
 				if err := json.Unmarshal([]byte(a.Config), &config); err != nil {
 					xlog.Error("Error unmarshalling action config", "error", err)
 					continue
 				}
 
-				a, err := Action(a.Name, agentName, config, pool, actionsConfigs, nil)
-				if err != nil {
-					continue
+				if os.Getenv("LOCALAGI_ENABLE_SERVER_WALLETS") == "true" && a.Name == ActionBrowse {
+					wallets, err := serverwallet.CreateServerWalletsFromConfig(ac.ServerWallets)
+					if err != nil {
+						xlog.Error("Error creating wallets", "error", err)
+						return allActions
+					}
+
+					action, err := Action(a.Name, agentName, map[string]string{}, pool, actionsConfigs, wallets, ac.PayLimits)
+					if err != nil {
+						continue
+					}
+					allActions = append(allActions, action)
+				} else {
+					a, err := Action(a.Name, agentName, config, pool, actionsConfigs, nil, nil)
+					if err != nil {
+						continue
+					}
+					allActions = append(allActions, a)
 				}
-				allActions = append(allActions, a)
 			}
 
 			if os.Getenv("LOCALAGI_ENABLE_SERVER_WALLETS") == "true" {
@@ -132,14 +146,14 @@ func Actions(actionsConfigs map[string]string) func(a *state.AgentConfig) func(c
 					ActionServerWalletWaitForTransactionConfirmation,
 				}
 
-				wallets, err := serverwallet.CreateServerWalletsFromConfig(a.ServerWallets)
+				wallets, err := serverwallet.CreateServerWalletsFromConfig(ac.ServerWallets)
 				if err != nil {
 					xlog.Error("Error creating wallets", "error", err)
 					return allActions
 				}
 
 				for _, walletAction := range walletActions {
-					a, err := Action(walletAction, agentName, map[string]string{}, pool, actionsConfigs, wallets)
+					a, err := Action(walletAction, agentName, map[string]string{}, pool, actionsConfigs, wallets, ac.PayLimits)
 					if err != nil {
 						continue
 					}
@@ -152,7 +166,7 @@ func Actions(actionsConfigs map[string]string) func(a *state.AgentConfig) func(c
 	}
 }
 
-func Action(name, agentName string, config map[string]string, pool *state.AgentPool, actionsConfigs map[string]string, wallets map[types.ServerWalletType]types.ServerWallet) (types.Action, error) {
+func Action(name, agentName string, config map[string]string, pool *state.AgentPool, actionsConfigs map[string]string, wallets map[types.ServerWalletType]types.ServerWallet, payLimits map[string]float64) (types.Action, error) {
 	var a types.Action
 	var err error
 
@@ -208,7 +222,11 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 	case ActionWikipedia:
 		a = actions.NewWikipedia(config)
 	case ActionBrowse:
-		a = actions.NewBrowse(config)
+		if len(wallets) > 0 {
+			a = actions.NewBrowseWithWallets(config, wallets, payLimits, pool)
+		} else {
+			a = actions.NewBrowse(config)
+		}
 	case ActionSendMail:
 		a = actions.NewSendMail(config)
 	case ActionTwitterPost:

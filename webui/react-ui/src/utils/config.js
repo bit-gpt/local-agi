@@ -22,6 +22,8 @@ export const API_CONFIG = {
     agentConfig: (name) => `/api/agent/${name}/config`,
     agentConfigMetadata: "/api/meta/agent/config",
     agentServerWallets: (name) => `/api/agent/${name}/server-wallets`,
+    agentPayLimits: (name) => `/api/agent/${name}/pay-limits`,
+    agentPayLimitStatus: (name) => `/api/agent/${name}/pay-limit-status`,
     createAgent: "/api/agent/create",
     deleteAgent: (name) => `/api/agent/${name}`,
     pauseAgent: (name) => `/api/agent/${name}/pause`,

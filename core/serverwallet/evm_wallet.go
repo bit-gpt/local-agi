@@ -3,8 +3,10 @@ package serverwallet
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 	"math/big"
+	"net/http"
 	"strings"
 	"time"
 
@@ -357,4 +359,114 @@ func (w *EVMServerWallet) WaitForTransactionWithTimeout(ctx context.Context, txH
 			return nil, err
 		}
 	}
+}
+
+func (w *EVMServerWallet) CreatePaymentTransaction(ctx context.Context, paymentReq H402PaymentRequirement) (string, string, error) {
+	if !common.IsHexAddress(paymentReq.PayToAddress) {
+		return "", "", fmt.Errorf("invalid recipient address: %s", paymentReq.PayToAddress)
+	}
+	toAddress := common.HexToAddress(paymentReq.PayToAddress)
+	fromAddress := common.HexToAddress(w.address)
+
+	var amount *big.Int
+	if paymentReq.TokenAddress == "0x0000000000000000000000000000000000000000" {
+		// Native ETH/BNB payment
+		if paymentReq.AmountRequiredFormat == "smallestUnit" {
+			// Amount is already in wei
+			amountFloat := new(big.Float).SetFloat64(paymentReq.AmountRequired)
+			amount, _ = amountFloat.Int(nil)
+		} else {
+			// Amount is in human-readable ETH/BNB, convert to wei
+			amountFloat := new(big.Float).SetFloat64(paymentReq.AmountRequired)
+			weiPerEth := new(big.Float).SetInt(big.NewInt(1e18))
+			amountInWei := new(big.Float).Mul(amountFloat, weiPerEth)
+			amount, _ = amountInWei.Int(nil)
+		}
+	} else {
+		// Token payment - get token decimals from chain config
+		chainConfig := coretypes.GetDefaultChainConfig(coretypes.ServerWalletType(w.config.Type))
+		decimals := 18 // Default to 18 decimals
+		for _, token := range chainConfig.SupportedTokens {
+			if strings.EqualFold(token.Address, paymentReq.TokenAddress) {
+				decimals = token.Decimals
+				break
+			}
+		}
+
+		if paymentReq.AmountRequiredFormat == "smallestUnit" {
+			// Amount is already in smallest token units
+			amountFloat := new(big.Float).SetFloat64(paymentReq.AmountRequired)
+			amount, _ = amountFloat.Int(nil)
+		} else {
+			// Amount is in human-readable token units, convert to smallest units
+			amountFloat := new(big.Float).SetFloat64(paymentReq.AmountRequired)
+			multiplier := new(big.Float).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil))
+			amountInTokens := new(big.Float).Mul(amountFloat, multiplier)
+			amount, _ = amountInTokens.Int(nil)
+		}
+	}
+
+	nonce, err := w.client.PendingNonceAt(ctx, fromAddress)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get nonce: %v", err)
+	}
+
+	gasPrice, err := w.client.SuggestGasPrice(ctx)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get gas price: %v", err)
+	}
+
+	chainConfig := coretypes.GetDefaultChainConfig(coretypes.ServerWalletType(w.config.Type))
+	chainID := big.NewInt(chainConfig.ChainID)
+
+	var tx *types.Transaction
+
+	if paymentReq.TokenAddress == "0x0000000000000000000000000000000000000000" {
+		gasLimit, err := w.EstimateGas(ctx, paymentReq.PayToAddress, amount, nil)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to estimate gas: %v", err)
+		}
+		tx = types.NewTransaction(nonce, toAddress, amount, gasLimit.Uint64(), gasPrice, nil)
+	} else {
+		if !common.IsHexAddress(paymentReq.TokenAddress) {
+			return "", "", fmt.Errorf("invalid token address: %s", paymentReq.TokenAddress)
+		}
+		tokenAddr := common.HexToAddress(paymentReq.TokenAddress)
+
+		data, err := w.erc20ABI.Pack("transfer", toAddress, amount)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to pack transfer call: %v", err)
+		}
+
+		gasLimit, err := w.EstimateGas(ctx, paymentReq.TokenAddress, big.NewInt(0), data)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to estimate gas: %v", err)
+		}
+
+		tx = types.NewTransaction(nonce, tokenAddr, big.NewInt(0), gasLimit.Uint64(), gasPrice, data)
+	}
+
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), w.privateKey)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to sign transaction: %v", err)
+	}
+
+	txBytes, err := signedTx.MarshalBinary()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to marshal transaction: %v", err)
+	}
+	txHex := "0x" + hex.EncodeToString(txBytes)
+
+	signatureHex := signedTx.Hash().Hex()
+
+	return txHex, signatureHex, nil
+}
+
+func (w *EVMServerWallet) GetH402Client() *H402Client {
+	return NewH402Client(w, w)
+}
+
+func (w *EVMServerWallet) SendH402Request(ctx context.Context, method, url string, requestBody []byte) (*http.Response, error) {
+	client := w.GetH402Client()
+	return client.SendH402Request(ctx, method, url, requestBody)
 }

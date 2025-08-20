@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import ServerWalletCard from "../ServerWalletCard";
+import PayLimitsModal from "../PayLimitsModal";
 import { agentApi } from "../../utils/api";
 
 /**
  * ServerWalletsSection component for the agent form
  * Displays server wallet addresses and balances for different blockchain networks
  */
-const ServerWalletsSection = ({ fetchServerWallets, agentId }) => {
+const ServerWalletsSection = ({ fetchServerWallets, agent, agentId, setAgent }) => {
   const { showToast } = useOutletContext();
   const [serverWallets, setServerWallets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isPayLimitsModalOpen, setIsPayLimitsModalOpen] = useState(false);
 
   useEffect(() => {
     if (fetchServerWallets) {
@@ -32,10 +34,21 @@ const ServerWalletsSection = ({ fetchServerWallets, agentId }) => {
 
   return (
     <div className="server-wallets-section">
-      <h3 className="section-title">Server Wallets</h3>
-      <p className="section-description">
-        View server wallet addresses and balances
-      </p>
+      <div className="section-header">
+        <div>
+          <h3 className="section-title">Server Wallets</h3>
+          <p className="section-description">
+            View server wallet addresses and balances
+          </p>
+        </div>
+        <button
+          className="btn-outline"
+          onClick={() => setIsPayLimitsModalOpen(true)}
+          type="button"
+        >
+          Edit Limits
+        </button>
+      </div>
 
       {loading ? (
         <div className="centered-loading">
@@ -50,6 +63,14 @@ const ServerWalletsSection = ({ fetchServerWallets, agentId }) => {
           </div>
         )
       )}
+
+      <PayLimitsModal
+        isOpen={isPayLimitsModalOpen}
+        onClose={() => setIsPayLimitsModalOpen(false)}
+        agent={agent}
+        agentId={agentId}
+        setAgent={setAgent}
+      />
     </div>
   );
 };
