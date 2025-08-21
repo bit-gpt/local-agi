@@ -1,6 +1,14 @@
+import { Link } from 'react-router-dom';
+
 function MobilePlaceholder() {
   return (
     <div className="mobile-placeholder-overlay">
+      <div className="logo-container">
+        <div className="logo-image-container">
+          <img src="/app/logo.svg" alt="Logo" className="logo-image" />
+        </div>
+      </div>
+      
       <div className="mobile-placeholder-modal">
         <div className="mobile-placeholder-content">
           <div className="mobile-placeholder-icon">
