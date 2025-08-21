@@ -4,6 +4,8 @@ import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import "./App.css";
 import { usePrivy, useLogin, useLogout } from "@privy-io/react-auth";
 import NavItem from "./components/NavItem";
+import MobilePlaceholder from "./components/MobilePlaceholder";
+import useIsMobile from "./hooks/useMobileDetect";
 
 function App() {
   const [toast, setToast] = useState({
@@ -15,6 +17,7 @@ function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   // Show toast notification (queue support, can show same toast multiple times)
   const showToast = (message, type = "success", duration = 3_000) => {
@@ -95,6 +98,10 @@ function App() {
       requiresAuth: true
     }
   ];
+
+  if (isMobile) {
+    return <MobilePlaceholder />;
+  }
 
   if (isAuthLoading) {
     return <div></div>;
