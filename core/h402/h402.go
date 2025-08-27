@@ -1,9 +1,10 @@
-package serverwallet
+package h402
 
 import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rlp"
+	bin "github.com/gagliardetto/binary"
+	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/mudler/LocalAGI/core/sse"
 	"github.com/mudler/LocalAGI/core/state"
@@ -113,6 +118,14 @@ func NewH402ClientWithWallets(wallets map[coretypes.ServerWalletType]coretypes.S
 	}
 }
 
+func NewH402ClientWithoutWallets(payLimits map[string]float64, agentID uuid.UUID, pool interface{}) *H402Client {
+	return &H402Client{
+		payLimits: payLimits,
+		agentID:   agentID,
+		pool:      pool,
+	}
+}
+
 func MapNetworkIDToWalletType(networkID string) (coretypes.ServerWalletType, error) {
 	switch networkID {
 	case "56", "97":
@@ -134,7 +147,7 @@ func MapNetworkIDToWalletType(networkID string) (coretypes.ServerWalletType, err
 	}
 }
 
-func (h *H402Client) SendH402RequestWithPaymentInfo(ctx context.Context, method, url string, requestBody []byte) (*H402ResponseWithPaymentInfo, error) {
+func (h *H402Client) makeInitialRequest(ctx context.Context, method, url string, requestBody []byte) (*http.Response, error) {
 	var bodyReader io.Reader
 	if requestBody != nil {
 		bodyReader = bytes.NewBuffer(requestBody)
@@ -155,6 +168,15 @@ func (h *H402Client) SendH402RequestWithPaymentInfo(ctx context.Context, method,
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make initial request: %v", err)
+	}
+
+	return resp, nil
+}
+
+func (h *H402Client) SendH402RequestWithPaymentInfo(ctx context.Context, method, url string, requestBody []byte) (*H402ResponseWithPaymentInfo, error) {
+	resp, err := h.makeInitialRequest(ctx, method, url, requestBody)
+	if err != nil {
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -262,6 +284,7 @@ func (h *H402Client) SendH402RequestWithPaymentInfo(ctx context.Context, method,
 	fmt.Println("Final Payment request:", req2)
 	fmt.Println("Wallet type:", wallet.GetWalletType())
 
+	client := &http.Client{}
 	finalResp, err := client.Do(req2)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make payment request: %v", err)
@@ -274,6 +297,191 @@ func (h *H402Client) SendH402RequestWithPaymentInfo(ctx context.Context, method,
 		AmountFormat: paymentReq.AmountRequiredFormat,
 		WalletType:   string(walletType),
 		Transaction:  paymentTx,
+		Namespace:    paymentReq.Namespace,
+		TokenAddress: paymentReq.TokenAddress,
+	}
+
+	if paymentResponseHeader := finalResp.Header.Get("X-Payment-Response"); paymentResponseHeader != "" {
+		if paymentResponseData, err := base64.StdEncoding.DecodeString(paymentResponseHeader); err == nil {
+			var responseData H402PaymentResponseData
+			if err := json.Unmarshal(paymentResponseData, &responseData); err == nil {
+				paymentInfo.Transaction = responseData.Transaction
+				paymentInfo.Namespace = responseData.Namespace
+			}
+		}
+	}
+
+	return &H402ResponseWithPaymentInfo{Response: finalResp, PaymentInfo: paymentInfo, PayLimitExceeded: nil, InfoError: nil}, nil
+}
+
+func (h *H402Client) SendH402RequestWithPaymentInfoAndWalletConnection(ctx context.Context, method, url string, requestBody []byte) (*H402ResponseWithPaymentInfo, error) {
+	resp, err := h.makeInitialRequest(ctx, method, url, requestBody)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusPaymentRequired {
+		return &H402ResponseWithPaymentInfo{Response: resp, PaymentInfo: nil, PayLimitExceeded: nil, InfoError: nil}, nil
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	fmt.Println("H402 response body:", string(body))
+
+	var h402Response H402Response
+	if err := json.Unmarshal(body, &h402Response); err != nil {
+		return nil, fmt.Errorf("failed to parse H402 response: %v", err)
+	}
+
+	if len(h402Response.Accepts) == 0 {
+		return nil, fmt.Errorf("no payment requirements found in H402 response")
+	}
+
+	paymentRequests := make([]map[string]interface{}, len(h402Response.Accepts))
+	for i, req := range h402Response.Accepts {
+		paymentRequests[i] = map[string]interface{}{
+			"selectedRequestID":    uuid.New().String(),
+			"namespace":            req.Namespace,
+			"tokenAddress":         req.TokenAddress,
+			"amountRequired":       req.AmountRequired,
+			"amountRequiredFormat": req.AmountRequiredFormat,
+			"payToAddress":         req.PayToAddress,
+			"networkID":            req.NetworkID,
+			"description":          req.Description,
+			"resource":             req.Resource,
+			"scheme":               req.Scheme,
+		}
+	}
+
+	requestID := uuid.New()
+
+	fmt.Println("User ID:", h.pool)
+
+	userIDStr := h.pool.(*state.AgentPool).GetUserID()
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID format: %v", err)
+	}
+
+	h402PendingRequest := models.H402PendingRequests{
+		ID:        requestID,
+		AgentID:   h.agentID,
+		UserID:    userID,
+		Status:    "Pending",
+		CreatedAt: time.Now(),
+	}
+
+	if err := db.DB.Create(&h402PendingRequest).Error; err != nil {
+		return nil, fmt.Errorf("failed to create h402 request: %v", err)
+	}
+
+	selectedRequestID, paymentTx, err := h.waitForSignedTransaction(ctx, requestID, paymentRequests)
+
+	if err != nil {
+		return &H402ResponseWithPaymentInfo{
+			Response:  resp,
+			InfoError: err,
+		}, nil
+	}
+
+	var paymentReq H402PaymentRequirement
+	var found bool
+	for _, req := range paymentRequests {
+		if req["selectedRequestID"].(string) == selectedRequestID.String() {
+			paymentReq = H402PaymentRequirement{
+				Namespace:            req["namespace"].(string),
+				TokenAddress:         req["tokenAddress"].(string),
+				AmountRequired:       req["amountRequired"].(float64),
+				AmountRequiredFormat: req["amountRequiredFormat"].(string),
+				PayToAddress:         req["payToAddress"].(string),
+				NetworkID:            req["networkID"].(string),
+				Description:          req["description"].(string),
+				Resource:             req["resource"].(string),
+				Scheme:               req["scheme"].(string),
+			}
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return nil, fmt.Errorf("payment request with ID %s not found", selectedRequestID.String())
+	}
+
+	walletType, err := MapNetworkIDToWalletType(paymentReq.NetworkID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map network ID to wallet type: %v", err)
+	}
+
+	var signature string
+	if paymentTx != nil {
+		var err error
+		signature, err = h.extractSignatureFromTransaction(*paymentTx, walletType)
+		if err != nil {
+			return &H402ResponseWithPaymentInfo{
+				Response:  resp,
+				InfoError: fmt.Errorf("failed to extract signature from transaction: %v", err),
+			}, nil
+		}
+	}
+
+	payload := H402PaymentPayload{
+		Type:      GetPaymentType(walletType),
+		Signature: signature,
+	}
+
+	if walletType == coretypes.ServerWalletTypeBNB || walletType == coretypes.ServerWalletTypeBASE {
+		if paymentTx != nil {
+			payload.SignedTransaction = *paymentTx
+		}
+	} else {
+		if paymentTx != nil {
+			payload.Transaction = *paymentTx
+		}
+	}
+
+	payment := H402Payment{
+		H402Version: 1,
+		Scheme:      paymentReq.Scheme,
+		Namespace:   paymentReq.Namespace,
+		NetworkID:   paymentReq.NetworkID,
+		Resource:    paymentReq.Resource,
+		Payload:     payload,
+	}
+
+	paymentJSON, err := json.Marshal(payment)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payment: %v", err)
+	}
+	paymentBase64 := base64.StdEncoding.EncodeToString(paymentJSON)
+
+	req2, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create payment request: %v", err)
+	}
+	req2.Header.Set("Content-Type", "application/json")
+	req2.Header.Set("X-PAYMENT", paymentBase64)
+	req2.Header.Set("Access-Control-Expose-Headers", "X-PAYMENT-RESPONSE")
+
+	fmt.Println("Final Payment request:", req2)
+
+	client := &http.Client{}
+	finalResp, err := client.Do(req2)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make payment request: %v", err)
+	}
+
+	fmt.Println("Final Payment response:", finalResp)
+
+	paymentInfo := &PaymentInfo{
+		Amount:       paymentReq.AmountRequired,
+		AmountFormat: paymentReq.AmountRequiredFormat,
+		WalletType:   string(walletType),
+		Transaction:  *paymentTx,
 		Namespace:    paymentReq.Namespace,
 		TokenAddress: paymentReq.TokenAddress,
 	}
@@ -557,7 +765,7 @@ func (h *H402Client) waitForPayment(ctx context.Context, payLimitError *PayLimit
 }
 
 func (h *H402Client) setAgentPayLimitStatus(payLimitStatus string) error {
-	result := db.DB.Model(&models.Agent{}).Where("id = ?", h.agentID).Update("payLimitStatus", payLimitStatus)
+	result := db.DB.Model(&models.Agent{}).Where("ID = ?", h.agentID).Update("payLimitStatus", payLimitStatus)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -569,8 +777,129 @@ func (h *H402Client) setAgentPayLimitStatus(payLimitStatus string) error {
 
 func (h *H402Client) getAgentPayLimitStatus() (string, error) {
 	var payLimitStatus string
-	if err := db.DB.Model(&models.Agent{}).Where("id = ?", h.agentID).Pluck("payLimitStatus", &payLimitStatus).Error; err != nil {
+	if err := db.DB.Model(&models.Agent{}).Where("ID = ?", h.agentID).Pluck("payLimitStatus", &payLimitStatus).Error; err != nil {
 		return "", err
 	}
 	return payLimitStatus, nil
+}
+
+func (h *H402Client) waitForSignedTransaction(ctx context.Context, requestID uuid.UUID, paymentRequests []map[string]interface{}) (uuid.UUID, *string, error) {
+
+	if h.pool != nil {
+		if agentPool, ok := h.pool.(*state.AgentPool); ok {
+			manager := agentPool.GetManager(h.agentID.String())
+			if manager != nil {
+				requestData := struct {
+					RequestID       string                   `json:"requestId"`
+					PaymentRequests []map[string]interface{} `json:"paymentRequests"`
+				}{
+					RequestID:       requestID.String(),
+					PaymentRequests: paymentRequests,
+				}
+
+				paymentRequestsData, err := json.Marshal(requestData)
+				if err != nil {
+					return uuid.Nil, nil, fmt.Errorf("failed to marshal payment request: %v", err)
+				}
+
+				manager.Send(
+					sse.NewMessage(string(paymentRequestsData)).WithEvent("request_signed_transaction"))
+			}
+		}
+	}
+
+	fmt.Printf("Waiting for signed transaction for request %s (agent %s)...\n", requestID, h.agentID)
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeoutCtx.Done():
+			if err := h.setH402RequestStatus(requestID, "CANCELLED"); err != nil {
+				fmt.Printf("Failed to set request status to cancelled after timeout: %v\n", err)
+			}
+			fmt.Printf("Signed transaction timeout for request %s, setting status=Cancelled\n", requestID)
+			return uuid.Nil, nil, fmt.Errorf("signed transaction timeout")
+		case <-ticker.C:
+			selectedRequestID, signedTx, status, err := h.getH402RequestSignedTransaction(requestID)
+			if err != nil {
+				fmt.Printf("Error checking signed transaction status: %v\n", err)
+				continue
+			}
+			if status == "APPROVED" && selectedRequestID != nil && signedTx != nil {
+				fmt.Printf("Signed transaction approved for request %s\n", requestID)
+				return *selectedRequestID, signedTx, nil
+			}
+			if status == "CANCELLED" {
+				fmt.Printf("Signed transaction cancelled for request %s\n", requestID)
+				return uuid.Nil, nil, fmt.Errorf("signed transaction cancelled")
+			}
+		}
+	}
+}
+
+func (h *H402Client) setH402RequestStatus(requestID uuid.UUID, status string) error {
+	result := db.DB.Model(&models.H402PendingRequests{}).Where("ID = ?", requestID).Update("status", status)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no request found with ID %s", requestID)
+	}
+	return nil
+}
+
+func (h *H402Client) getH402RequestSignedTransaction(requestID uuid.UUID) (*uuid.UUID, *string, string, error) {
+	var request models.H402PendingRequests
+	if err := db.DB.Where("ID = ?", requestID).First(&request).Error; err != nil {
+		return nil, nil, "", err
+	}
+	return request.SelectedRequestID, request.SignedTransaction, request.Status, nil
+}
+
+func (h *H402Client) extractSignatureFromTransaction(signedTx string, walletType coretypes.ServerWalletType) (string, error) {
+	if walletType == coretypes.ServerWalletTypeBNB || walletType == coretypes.ServerWalletTypeBASE {
+		return h.extractEVMSignature(signedTx)
+	} else if walletType == coretypes.ServerWalletTypeSOL {
+		return h.extractSolanaSignature(signedTx)
+	}
+	return "", fmt.Errorf("unsupported wallet type for signature extraction: %s", walletType)
+}
+
+func (h *H402Client) extractEVMSignature(signedTxHex string) (string, error) {
+	signedTxHex = strings.TrimPrefix(signedTxHex, "0x")
+
+	signedTxBytes, err := hex.DecodeString(signedTxHex)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode signed transaction hex: %v", err)
+	}
+
+	var tx types.Transaction
+	if err := rlp.DecodeBytes(signedTxBytes, &tx); err != nil {
+		return "", fmt.Errorf("failed to decode signed transaction: %v", err)
+	}
+
+	return tx.Hash().Hex(), nil
+}
+
+func (h *H402Client) extractSolanaSignature(signedTxBase64 string) (string, error) {
+	signedTxBytes, err := base64.StdEncoding.DecodeString(signedTxBase64)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode signed transaction base64: %v", err)
+	}
+
+	tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(signedTxBytes))
+	if err != nil {
+		return "", fmt.Errorf("failed to decode Solana transaction: %v", err)
+	}
+
+	if len(tx.Signatures) == 0 {
+		return "", fmt.Errorf("no signatures found in transaction")
+	}
+
+	return tx.Signatures[0].String(), nil
 }

@@ -225,7 +225,7 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		if len(wallets) > 0 {
 			a = actions.NewBrowseWithWallets(config, wallets, payLimits, pool)
 		} else {
-			a = actions.NewBrowse(config)
+			a = actions.NewBrowse(config, pool)
 		}
 	case ActionSendMail:
 		a = actions.NewSendMail(config)

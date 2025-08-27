@@ -24,6 +24,7 @@ function Chat() {
   const [currentStatus, setCurrentStatus] = useState(null);
   const [eventSource, setEventSource] = useState(null);
   const [requirePaymentApproval, setRequirePaymentApproval] = useState(null);
+  const [paymentRequestsData, setPaymentRequestsData] = useState(null);
   // Helper function to map observable data to user-friendly status messages
   const getStatusMessage = (observable) => {
     if (!observable) return null;
@@ -113,12 +114,17 @@ function Chat() {
           if (actionName.includes("email") || actionName.includes("mail"))
             return "Sending email";
           if (actionName.includes("shell")) return "Running command";
-          if (actionName.includes("estimate_transaction_fee")) return "Estimating transaction fee";
-          if (actionName.includes("get_server_wallet_address")) return "Getting server wallet address";
-          if (actionName.includes("get_all_server_wallet_balances")) return "Getting server wallet balances";
-          if (actionName.includes("get_server_wallet_balance")) return "Getting server wallet balance";
+          if (actionName.includes("estimate_transaction_fee"))
+            return "Estimating transaction fee";
+          if (actionName.includes("get_server_wallet_address"))
+            return "Getting server wallet address";
+          if (actionName.includes("get_all_server_wallet_balances"))
+            return "Getting server wallet balances";
+          if (actionName.includes("get_server_wallet_balance"))
+            return "Getting server wallet balance";
           if (actionName.includes("send_crypto")) return "Sending crypto";
-          if (actionName.includes("wait_for_transaction_confirmation")) return "Waiting for transaction confirmation";
+          if (actionName.includes("wait_for_transaction_confirmation"))
+            return "Waiting for transaction confirmation";
           return `Running ${actionName}`;
         }
         return "Taking action";
@@ -189,6 +195,11 @@ function Chat() {
       setRequirePaymentApproval(event.data);
     });
 
+    sse.addEventListener("request_signed_transaction", (event) => {
+      console.log("request_signed_transaction", event.data);
+      setPaymentRequestsData(JSON.parse(event.data));
+    });
+
     sse.onerror = (err) => {
       console.error("SSE connection error:", err);
     };
@@ -257,17 +268,17 @@ function Chat() {
   };
 
   const handleApprovePayment = async () => {
-   setApproveLoading(true);
-   try {
-    await agentApi.updateAgentPayLimitStatus(id, PAY_LIMIT_STATUS.APPROVED);
-    showToast("Payment approved successfully", "success");
-    setRequirePaymentApproval(null);
-   } catch (error) {
-    console.error("Failed to approve payment", error);
-    showToast && showToast(error?.message || String(error), "error");
-   } finally {
-    setApproveLoading(false);
-   }
+    setApproveLoading(true);
+    try {
+      await agentApi.updateAgentPayLimitStatus(id, PAY_LIMIT_STATUS.APPROVED);
+      showToast("Payment approved successfully", "success");
+      setRequirePaymentApproval(null);
+    } catch (error) {
+      console.error("Failed to approve payment", error);
+      showToast && showToast(error?.message || String(error), "error");
+    } finally {
+      setApproveLoading(false);
+    }
   };
 
   const handleCancelPayment = async () => {
@@ -282,6 +293,30 @@ function Chat() {
     } finally {
       setCancelLoading(false);
     }
+  };
+
+  const handleCancelPaymentRequest = async () => {
+    setCancelLoading(true);
+    try {
+      await agentApi.submitSignedTransaction(
+        id,
+        paymentRequestsData.requestId,
+        {
+          status: "CANCELLED",
+        }
+      );
+      showToast("Payment request cancelled successfully", "success");
+      setPaymentRequestsData(null);
+    } catch (error) {
+      console.error("Failed to cancel payment", error);
+      showToast && showToast(error?.message || String(error), "error");
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
+  const openPaymentModal = () => {
+    console.log("openPaymentModal", paymentRequestsData);
   };
 
   if (!agentConfig) {
@@ -453,7 +488,11 @@ function Chat() {
                       fontWeight: currentStatus.isError ? 400 : 500,
                     }}
                   >
-                    {requirePaymentApproval ? 'Waiting for your confirmation' : currentStatus.message}
+                    {requirePaymentApproval
+                      ? "Waiting for your confirmation"
+                      : paymentRequestsData
+                      ? "Waiting for your payment"
+                      : currentStatus.message}
                   </span>
                 </div>
               </div>
@@ -478,6 +517,31 @@ function Chat() {
                     className="btn-outline"
                     onClick={handleCancelPayment}
                     disabled={cancelLoading || approveLoading}
+                  >
+                    {cancelLoading && <div className="btn-spinner outline" />}
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+
+            {paymentRequestsData && (
+              <>
+                <div className="payment-approval-message">
+                  {requirePaymentApproval}
+                </div>
+                <div className="payment-approval-container">
+                  <button
+                    className="btn-solid"
+                    onClick={openPaymentModal}
+                    disabled={cancelLoading}
+                  >
+                    Pay now
+                  </button>
+                  <button
+                    className="btn-outline"
+                    onClick={handleCancelPaymentRequest}
+                    disabled={cancelLoading}
                   >
                     {cancelLoading && <div className="btn-spinner outline" />}
                     Cancel

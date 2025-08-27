@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/mudler/LocalAGI/core/h402"
 	coretypes "github.com/mudler/LocalAGI/core/types"
 )
 
@@ -361,7 +362,7 @@ func (w *EVMServerWallet) WaitForTransactionWithTimeout(ctx context.Context, txH
 	}
 }
 
-func (w *EVMServerWallet) CreatePaymentTransaction(ctx context.Context, paymentReq H402PaymentRequirement) (string, string, error) {
+func (w *EVMServerWallet) CreatePaymentTransaction(ctx context.Context, paymentReq h402.H402PaymentRequirement) (string, string, error) {
 	if !common.IsHexAddress(paymentReq.PayToAddress) {
 		return "", "", fmt.Errorf("invalid recipient address: %s", paymentReq.PayToAddress)
 	}
@@ -462,8 +463,8 @@ func (w *EVMServerWallet) CreatePaymentTransaction(ctx context.Context, paymentR
 	return txHex, signatureHex, nil
 }
 
-func (w *EVMServerWallet) GetH402Client() *H402Client {
-	return NewH402Client(w, w)
+func (w *EVMServerWallet) GetH402Client() *h402.H402Client {
+	return h402.NewH402Client(w, w)
 }
 
 func (w *EVMServerWallet) SendH402Request(ctx context.Context, method, url string, requestBody []byte) (*http.Response, error) {

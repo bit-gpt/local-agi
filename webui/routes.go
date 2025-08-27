@@ -206,6 +206,8 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 	webapp.Put("/api/agent/:id/pay-limits", app.RequireUser(), app.RequireActiveAgent(), app.RequireServerWalletsEnabled(), app.RequireActiveStatusAgent(), app.UpdateAgentPayLimits())
 	webapp.Put("/api/agent/:id/pay-limit-status", app.RequireUser(), app.RequireActiveAgent(), app.RequireServerWalletsEnabled(), app.UpdateAgentPayLimitStatus())
 
+	webapp.Put("/api/agent/:id/h402/:requestId/signed-transaction", app.RequireUser(), app.RequireActiveAgent(), app.RequireActiveStatusAgent(), app.SubmitSignedTransaction())
+
 	// Metadata endpoint for agent configuration fields
 	webapp.Get("/api/agent/config/metadata", app.RequireUser(), app.GetAgentConfigMeta())
 

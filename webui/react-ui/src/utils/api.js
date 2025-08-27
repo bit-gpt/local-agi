@@ -194,6 +194,18 @@ export const agentApi = {
     return handleResponse(response);
   },
 
+  submitSignedTransaction: async (name, requestId, body) => {
+    const response = await fetch(
+      buildUrl(API_CONFIG.endpoints.submitSignedTransaction(name, requestId)),
+      {
+        method: "PUT",
+        headers: API_CONFIG.headers,
+        body: JSON.stringify(body),
+      }
+    );
+    return handleResponse(response);
+  },
+
   // Delete an agent
   deleteAgent: async (name) => {
     const response = await fetch(

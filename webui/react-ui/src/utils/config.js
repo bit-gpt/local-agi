@@ -24,6 +24,7 @@ export const API_CONFIG = {
     agentServerWallets: (name) => `/api/agent/${name}/server-wallets`,
     agentPayLimits: (name) => `/api/agent/${name}/pay-limits`,
     agentPayLimitStatus: (name) => `/api/agent/${name}/pay-limit-status`,
+    submitSignedTransaction: (name, requestId) => `/api/agent/${name}/h402/${requestId}/signed-transaction`,
     createAgent: "/api/agent/create",
     deleteAgent: (name) => `/api/agent/${name}`,
     pauseAgent: (name) => `/api/agent/${name}/pause`,
