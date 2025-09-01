@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/v69/github"
@@ -80,11 +81,43 @@ func (g *GithubPRCreator) ensureFork(ctx context.Context, owner, repo string) (s
 	return "", fmt.Errorf("fork creation timed out")
 }
 
+// initializeEmptyRepository creates an initial commit in an empty repository
+func (g *GithubPRCreator) initializeEmptyRepository(ctx context.Context, owner, repository string) error {
+	// Create initial README to establish the repository
+	readmeContent := "# " + repository + "\n\nInitialized by LocalAGI"
+
+	_, _, err := g.client.Repositories.CreateFile(ctx, owner, repository, "README.md", &github.RepositoryContentFileOptions{
+		Message: github.Ptr("Initial commit"),
+		Content: []byte(readmeContent),
+		Branch:  &g.defaultBranch,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create initial README: %w", err)
+	}
+
+	return nil
+}
+
 func (g *GithubPRCreator) createOrUpdateBranch(ctx context.Context, branchName string, owner string, repository string) error {
-	// Get the latest commit SHA from the default branch
+	// Try to get the latest commit SHA from the default branch
 	ref, _, err := g.client.Git.GetRef(ctx, owner, repository, "refs/heads/"+g.defaultBranch)
 	if err != nil {
-		return fmt.Errorf("failed to get reference for default branch %s: %w", g.defaultBranch, err)
+		// Check if repository is empty (409 error or specific error message)
+		if strings.Contains(err.Error(), "Git Repository is empty") || strings.Contains(err.Error(), "409") {
+			// Initialize repository with empty commit on default branch
+			err = g.initializeEmptyRepository(ctx, owner, repository)
+			if err != nil {
+				return fmt.Errorf("failed to initialize empty repository: %w", err)
+			}
+
+			// Now get the reference we just created
+			ref, _, err = g.client.Git.GetRef(ctx, owner, repository, "refs/heads/"+g.defaultBranch)
+			if err != nil {
+				return fmt.Errorf("failed to get reference after initialization: %w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to get reference for default branch %s: %w", g.defaultBranch, err)
+		}
 	}
 
 	// Try to get the branch if it exists
@@ -97,7 +130,7 @@ func (g *GithubPRCreator) createOrUpdateBranch(ctx context.Context, branchName s
 		// If branch doesn't exist (404), create it
 		if resp.StatusCode == 404 {
 			newRef := &github.Reference{
-				Ref:    github.String("refs/heads/" + branchName),
+				Ref:    github.Ptr("refs/heads/" + branchName),
 				Object: &github.GitObject{SHA: ref.Object.SHA},
 			}
 			_, _, err = g.client.Git.CreateRef(ctx, owner, repository, newRef)
@@ -113,7 +146,7 @@ func (g *GithubPRCreator) createOrUpdateBranch(ctx context.Context, branchName s
 
 	// Branch exists, update it to the latest commit
 	updateRef := &github.Reference{
-		Ref:    github.String("refs/heads/" + branchName),
+		Ref:    github.Ptr("refs/heads/" + branchName),
 		Object: &github.GitObject{SHA: ref.Object.SHA},
 	}
 	_, _, err = g.client.Git.UpdateRef(ctx, owner, repository, updateRef, true)

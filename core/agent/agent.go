@@ -1246,7 +1246,19 @@ func (a *Agent) reply(job *types.Job, role string, conv Messages, actionParams t
 	// At this point can only be a reply action
 	xlog.Info("Computing reply", "agent", a.Character.Name)
 
-	forceResponsePrompt := `Based on the tool results and information above, provide a helpful and informative response to the user. Use the data from any tool calls that were executed to give a complete answer.
+	// Base response prompt
+	basePrompt := `Based on the tool results and information above, provide a helpful and informative response to the user. Use the data from any tool calls that were executed to give a complete answer.`
+
+	// Formatting rules
+	emailFormattingRules := `
+
+CRITICAL: Since an email was just sent, your response should be in PLAIN TEXT format ONLY.
+- Do NOT use any markdown syntax: NO **bold**, *italic*, bullet points (-), numbered lists (1.), or any markdown
+- Use plain text with proper spacing and line breaks for readability
+- Use CAPITAL LETTERS for emphasis if needed
+- This applies to your response to the user, not the email content itself`
+
+	markdownFormattingRules := `
 
 CRITICAL TABLE FORMATTING RULES:
 1. When you receive data in ASCII table format (with +---+ borders and | separators), ALWAYS extract and reformat it into clean markdown tables
@@ -1262,6 +1274,27 @@ CRITICAL TABLE FORMATTING RULES:
 7. Focus on the most relevant columns: Company Name, Description, Founding Year, Funding, Business Model
 8. If data is incomplete, use "N/A" or "–" for missing values
 9. Always prioritize creating actual tables over text descriptions when tabular data exists`
+
+	// Check if we just executed an email action to adjust formatting
+	var forceResponsePrompt string
+	if len(conv) > 0 {
+		// Look for email tool calls in recent conversation
+		hasEmailAction := false
+		for i := len(conv) - 1; i >= 0 && i >= len(conv)-3; i-- { // Check last 3 messages
+			if conv[i].Role == "tool" && strings.Contains(conv[i].Name, "send_email") {
+				hasEmailAction = true
+				break
+			}
+		}
+
+		if hasEmailAction {
+			forceResponsePrompt = basePrompt + emailFormattingRules
+		} else {
+			forceResponsePrompt = basePrompt + markdownFormattingRules
+		}
+	} else {
+		forceResponsePrompt = basePrompt + markdownFormattingRules
+	}
 
 	// If we have a hud, display it when answering normally
 	if a.options.enableHUD {

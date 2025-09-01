@@ -6,6 +6,7 @@ import { agentApi } from "../utils/api";
 import TypingIndicator from "../components/TypingIndicator";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import PaymentModal from "../paywall/components/PaymentModal";
 
 const PAY_LIMIT_STATUS = {
   APPROVED: "APPROVED",
@@ -20,28 +21,27 @@ function Chat() {
   const messagesEndRef = useRef(null);
   const [approveLoading, setApproveLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
-  // Observable status tracking
+
   const [currentStatus, setCurrentStatus] = useState(null);
   const [eventSource, setEventSource] = useState(null);
   const [requirePaymentApproval, setRequirePaymentApproval] = useState(null);
   const [paymentRequestsData, setPaymentRequestsData] = useState(null);
-  // Helper function to map observable data to user-friendly status messages
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [hasScrolledToInitialMessages, setHasScrolledToInitialMessages] = useState(false);
+
   const getStatusMessage = (observable) => {
     if (!observable) return null;
 
-    // Check for errors first
     if (observable.completion?.error) {
       return "Error while processing. Please try again.";
     }
 
     const name = observable.name?.toLowerCase() || "";
 
-    // Map different observable types to user-friendly messages
     switch (name) {
       case "job":
         return "Thinking";
       case "decision":
-        // Check for tool calls in completion to provide more specific status
         const completion = observable.completion;
         if (
           completion?.chat_completion_response?.choices?.[0]?.message
@@ -53,7 +53,6 @@ function Chat() {
             let toolName =
               toolCalls[0].function?.name || toolCalls[0].name || "";
 
-            // Try to extract actual tool from arguments if function name is generic (like "pick_tool")
             if (toolName === "pick_tool" || toolName === "call_tool") {
               try {
                 const args = JSON.parse(
@@ -63,7 +62,6 @@ function Chat() {
                   toolName = args.tool;
                 }
               } catch (e) {
-                // If parsing fails, keep the original toolName
                 console.log("Failed to parse tool arguments:", e);
               }
             }
@@ -98,14 +96,12 @@ function Chat() {
             if (toolName.toLowerCase().includes("reply")) {
               return "Preparing response";
             }
-            // Generic tool call message
             return null;
           }
         }
         setRequirePaymentApproval(null);
         return "Thinking";
       case "action":
-        // Try to get more specific message based on action type
         const actionName = observable.creation?.function_definition?.name;
         if (actionName) {
           if (actionName.includes("search")) return "Searching the web";
@@ -135,18 +131,11 @@ function Chat() {
     }
   };
 
-  // Helper function to check if an observable has an error
-  const hasError = (observable) => {
-    return observable?.completion?.error;
-  };
-
-  // Fetch agent config on mount
   useEffect(() => {
     const fetchAgentConfig = async () => {
       try {
         const config = await agentApi.getAgentConfig(id);
         setAgentConfig(config);
-        // setIsOpenRouter(config.model.split("/")[0] === "openrouter");
       } catch (error) {
         console.error("Failed to load agent config", error);
         showToast && showToast(error?.message || String(error), "error");
@@ -156,7 +145,6 @@ function Chat() {
     fetchAgentConfig();
   }, []);
 
-  // Setup SSE connection for observable updates
   useEffect(() => {
     if (!id) return;
 
@@ -167,7 +155,6 @@ function Chat() {
       const data = JSON.parse(event.data);
 
       if (data.completion) {
-        // Observable is completed
         if (data.completion.error) {
           setCurrentStatus({
             message: "Error while processing. Please try again.",
@@ -182,7 +169,6 @@ function Chat() {
           }
         }
       } else {
-        // Observable is active, show its status
         const statusMessage = getStatusMessage(data);
         if (statusMessage) {
           setCurrentStatus({ message: statusMessage, isError: false });
@@ -211,12 +197,10 @@ function Chat() {
     };
   }, [id]);
 
-  // Callback to clear status when chat processing is completed
   const handleStatusCompleted = useCallback(() => {
     setCurrentStatus(null);
   }, []);
 
-  // Use our custom chat hook with model from agent config
   const {
     messages,
     sending,
@@ -227,7 +211,6 @@ function Chat() {
     clearError,
   } = useChat(id, agentConfig?.model, handleStatusCompleted);
 
-  // Clear status when we receive a new assistant message
   useEffect(() => {
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
@@ -247,22 +230,19 @@ function Chat() {
   }, [agentConfig]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, currentStatus, requirePaymentApproval]);
-
-  // useEffect(() => {
-  //   if (error) {
-  //     showToast && showToast(error?.message || String(error), "error");
-  //     clearError();
-  //   }
-  // }, [error, showToast, clearError]);
+    if (!hasScrolledToInitialMessages && messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+      setHasScrolledToInitialMessages(true);
+    } else if (hasScrolledToInitialMessages) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, currentStatus, requirePaymentApproval, hasScrolledToInitialMessages]);
 
   const handleSend = (e) => {
     e.preventDefault();
     if (message.trim() !== "") {
       sendMessage(message);
       setMessage("");
-      // Clear any existing status when sending a new message
       setCurrentStatus(null);
     }
   };
@@ -316,7 +296,7 @@ function Chat() {
   };
 
   const openPaymentModal = () => {
-    console.log("openPaymentModal", paymentRequestsData);
+    setPaymentModalOpen(true);
   };
 
   if (!agentConfig) {
@@ -340,10 +320,8 @@ function Chat() {
             description="Send messages and interact with your agent in real time."
             name={agentConfig.name}
           />
-          {/* No right content for chat header */}
         </div>
 
-        {/* Chat Window */}
         <div
           className="section-box chat-section-box"
           style={{
@@ -402,7 +380,7 @@ function Chat() {
                           </ReactMarkdown>
                         </div>
                       </div>
-                    ) : // Check if this is an error message
+                    ) :
                     msg.type === "error" ? (
                       <div
                         style={{
@@ -448,7 +426,6 @@ function Chat() {
               )
             )}
 
-            {/* Show current status as a temporary message */}
             {currentStatus && (
               <div
                 style={{
@@ -498,7 +475,6 @@ function Chat() {
               </div>
             )}
 
-            {/* Show Approve & Cancel buttons when payment approval is required */}
             {requirePaymentApproval && (
               <>
                 <div className="payment-approval-message">
@@ -553,7 +529,6 @@ function Chat() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Chat Input */}
           <form
             onSubmit={handleSend}
             style={{ display: "flex", gap: 12, alignItems: "center" }}
@@ -599,6 +574,13 @@ function Chat() {
           </form>
         </div>
       </div>
+      {paymentModalOpen && (
+        <PaymentModal
+          isOpen={paymentModalOpen}
+          onClose={() => setPaymentModalOpen(false)}
+          paymentRequirements={paymentRequestsData.paymentRequests}
+        />
+      )}
     </div>
   );
 }

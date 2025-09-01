@@ -27,15 +27,19 @@ import (
 )
 
 type H402PaymentRequirement struct {
-	Namespace            string  `json:"namespace"`
-	TokenAddress         string  `json:"tokenAddress"`
-	AmountRequired       float64 `json:"amountRequired"`
-	AmountRequiredFormat string  `json:"amountRequiredFormat"`
-	PayToAddress         string  `json:"payToAddress"`
-	NetworkID            string  `json:"networkId"`
-	Description          string  `json:"description"`
-	Resource             string  `json:"resource"`
-	Scheme               string  `json:"scheme"`
+	Namespace               string  `json:"namespace"`
+	TokenAddress            string  `json:"tokenAddress"`
+	AmountRequired          float64 `json:"amountRequired"`
+	AmountRequiredFormat    string  `json:"amountRequiredFormat"`
+	PayToAddress            string  `json:"payToAddress"`
+	NetworkID               string  `json:"networkId"`
+	Description             string  `json:"description"`
+	Resource                string  `json:"resource"`
+	Scheme                  string  `json:"scheme"`
+	MimeType                string  `json:"mimeType"`
+	EstimatedProcessingTime int     `json:"estimatedProcessingTime"`
+	TokenDecimals           int     `json:"tokenDecimals"`
+	TokenSymbol             string  `json:"tokenSymbol"`
 }
 
 type H402Response struct {
@@ -126,8 +130,8 @@ func NewH402ClientWithoutWallets(payLimits map[string]float64, agentID uuid.UUID
 	}
 }
 
-func MapNetworkIDToWalletType(networkID string) (coretypes.ServerWalletType, error) {
-	switch networkID {
+func MapNetworkIDToWalletType(networkId string) (coretypes.ServerWalletType, error) {
+	switch networkId {
 	case "56", "97":
 		return coretypes.ServerWalletTypeBNB, nil
 	case "8453", "84532":
@@ -135,7 +139,7 @@ func MapNetworkIDToWalletType(networkID string) (coretypes.ServerWalletType, err
 	case "mainnet", "devnet", "testnet":
 		return coretypes.ServerWalletTypeSOL, nil
 	default:
-		if chainID, err := strconv.ParseInt(networkID, 10, 64); err == nil {
+		if chainID, err := strconv.ParseInt(networkId, 10, 64); err == nil {
 			switch chainID {
 			case 56, 97:
 				return coretypes.ServerWalletTypeBNB, nil
@@ -143,7 +147,7 @@ func MapNetworkIDToWalletType(networkID string) (coretypes.ServerWalletType, err
 				return coretypes.ServerWalletTypeBASE, nil
 			}
 		}
-		return "", fmt.Errorf("unsupported network ID: %s", networkID)
+		return "", fmt.Errorf("unsupported network ID: %s", networkId)
 	}
 }
 
@@ -343,17 +347,39 @@ func (h *H402Client) SendH402RequestWithPaymentInfoAndWalletConnection(ctx conte
 
 	paymentRequests := make([]map[string]interface{}, len(h402Response.Accepts))
 	for i, req := range h402Response.Accepts {
+		// Get token decimals and symbol from chain config if not provided
+		tokenDecimals := req.TokenDecimals
+		tokenSymbol := req.TokenSymbol
+
+		if tokenDecimals == 0 || tokenSymbol == "" {
+			walletType, err := MapNetworkIDToWalletType(req.NetworkID)
+			if err == nil {
+				walletTypeStr := string(walletType)
+
+				if tokenDecimals == 0 {
+					tokenDecimals = getDecimalsForToken(req.TokenAddress, walletTypeStr)
+				}
+				if tokenSymbol == "" {
+					tokenSymbol = detectTokenSymbolFromChainConfig(req.TokenAddress, walletTypeStr)
+				}
+			}
+		}
+
 		paymentRequests[i] = map[string]interface{}{
-			"selectedRequestID":    uuid.New().String(),
-			"namespace":            req.Namespace,
-			"tokenAddress":         req.TokenAddress,
-			"amountRequired":       req.AmountRequired,
-			"amountRequiredFormat": req.AmountRequiredFormat,
-			"payToAddress":         req.PayToAddress,
-			"networkID":            req.NetworkID,
-			"description":          req.Description,
-			"resource":             req.Resource,
-			"scheme":               req.Scheme,
+			"selectedRequestID":       uuid.New().String(),
+			"namespace":               req.Namespace,
+			"tokenAddress":            req.TokenAddress,
+			"amountRequired":          req.AmountRequired,
+			"amountRequiredFormat":    req.AmountRequiredFormat,
+			"payToAddress":            req.PayToAddress,
+			"networkId":               req.NetworkID,
+			"description":             req.Description,
+			"resource":                req.Resource,
+			"scheme":                  req.Scheme,
+			"mimeType":                req.MimeType,
+			"estimatedProcessingTime": req.EstimatedProcessingTime,
+			"tokenDecimals":           tokenDecimals,
+			"tokenSymbol":             tokenSymbol,
 		}
 	}
 
@@ -398,7 +424,7 @@ func (h *H402Client) SendH402RequestWithPaymentInfoAndWalletConnection(ctx conte
 				AmountRequired:       req["amountRequired"].(float64),
 				AmountRequiredFormat: req["amountRequiredFormat"].(string),
 				PayToAddress:         req["payToAddress"].(string),
-				NetworkID:            req["networkID"].(string),
+				NetworkID:            req["networkId"].(string),
 				Description:          req["description"].(string),
 				Resource:             req["resource"].(string),
 				Scheme:               req["scheme"].(string),
