@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/mudler/LocalAGI/core/h402"
@@ -125,7 +126,12 @@ func (a *BrowseAction) Run(ctx context.Context, sharedState *types.AgentSharedSt
 	resultMessage := fmt.Sprintf("Successfully browsed '%s':\n\n", result.URL)
 
 	if respWithPaymentInfo != nil && respWithPaymentInfo.PaymentInfo != nil {
-		paymentMessage := h402.FormatPaymentMessage(respWithPaymentInfo.PaymentInfo)
+		var paymentMessage string
+		if os.Getenv("LOCALAGI_ENABLE_SERVER_WALLETS") == "true" {
+			paymentMessage = h402.FormatPaymentMessage(respWithPaymentInfo.PaymentInfo)
+		} else {
+			paymentMessage = h402.FormatPaymentMessageWalletConnection(respWithPaymentInfo.PaymentInfo)
+		}
 		resultMessage += paymentMessage + "\n\n"
 	}
 

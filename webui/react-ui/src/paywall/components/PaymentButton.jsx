@@ -25,13 +25,15 @@ export default function PaymentButton({
       case "processing":
         return "Processing Payment...";
       case "success":
-        return "Payment Sent! Please wait for confirmation...";
+        return "Waiting for confirmation...";
       case "facilitator_error":
         return "Service Unavailable";
       default:
         return `Pay - ${amount}`;
     }
   };
+
+  console.log("amountssssssssssss", amount);
 
   return (
     <div className="flex flex-col w-full">

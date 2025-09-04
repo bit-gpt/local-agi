@@ -2,6 +2,7 @@ import {useCallback, useEffect, useRef, useState} from "react";
 import {createPaymentHeader, h402Version} from "@bit-gpt/h402";
 import {useEvmWallet} from "../context/EvmWalletContext";
 import PaymentButtonUI from "../../components/PaymentButton";
+import EvmWalletSelector from "./EvmWalletSelector";
 
 /**
  * EVM-specific payment handler
@@ -15,19 +16,32 @@ export default function EvmPaymentHandler({
                                             paymentStatus,
                                             setPaymentStatus,
                                             className = "",
+                                            networkId = "bsc", // Default to BSC for backwards compatibility
                                           }) {
   // State for the payment flow
   const [errorMessage, setErrorMessage] = useState(null);
+  const [selectedWallet, setSelectedWallet] = useState(null);
+  const [lastNetworkId, setLastNetworkId] = useState(networkId);
 
-  // Get EVM wallet context
-  const {walletClient, connectedAddress, connectWallet} = useEvmWallet();
+  const {walletClient, connectedAddress, connectWallet, disconnectWallet} = useEvmWallet();
 
-  // Simplified ref to track payment attempts
   const paymentAttemptRef = useRef({
     attemptInProgress: false,
   });
 
-  // Handle button click for unified experience
+  useEffect(() => {
+    if (lastNetworkId !== networkId && connectedAddress) {
+      console.log("[DEBUG] Network changed from", lastNetworkId, "to", networkId, "- disconnecting wallet");
+      disconnectWallet();
+      setSelectedWallet(null);
+      setLastNetworkId(networkId);
+      console.log("DISCONNECTED WALLET");
+    } else if (lastNetworkId !== networkId) {
+      setLastNetworkId(networkId);
+      console.log("SET LAST NETWORK ID", lastNetworkId);
+    }
+  }, [networkId, lastNetworkId, connectedAddress, disconnectWallet]);
+
   const handleButtonClick = async () => {
     console.log("[DEBUG] Button clicked", {
       hasWallet: !!walletClient,
@@ -35,29 +49,33 @@ export default function EvmPaymentHandler({
       currentStatus: paymentStatus,
     });
 
-    // If not connected, connect first
     if (!connectedAddress) {
-      await handleConnectWallet();
+      if (!selectedWallet) {
+        setErrorMessage("Please select a wallet to connect");
+        return;
+      }
+      await handleConnectWallet(selectedWallet);
       return;
     }
 
-    // If already connected, process payment
     setPaymentStatus("approving");
   };
 
-  // Connect wallet handler
-  const handleConnectWallet = async () => {
+  const handleConnectWallet = async (walletId = selectedWallet) => {
+    if (!walletId) {
+      setErrorMessage("Please select a wallet first");
+      return;
+    }
+
     setErrorMessage(null);
     setPaymentStatus("connecting");
 
     try {
-      console.log("[DEBUG] Connecting EVM wallet");
+      console.log("[DEBUG] Connecting EVM wallet:", walletId, "to network:", networkId);
 
-      // Default to MetaMask
-      await connectWallet("metamask");
+      await connectWallet(walletId, networkId);
 
-      // If we get here, connection was successful
-      setPaymentStatus("approving"); // Go directly to payment approval
+      setPaymentStatus("approving");
     } catch (err) {
       console.error("[DEBUG] EVM wallet connection error:", err);
       setPaymentStatus("error");
@@ -67,13 +85,15 @@ export default function EvmPaymentHandler({
     }
   };
 
-  // Update payment status callbacks
+  const handleWalletSelect = (walletId) => {
+    setSelectedWallet(walletId);
+  };
+
   const handlePaymentSuccess = useCallback(
     (paymentHeader) => {
       console.log("[DEBUG] Payment sent and signed");
       console.log("[DEBUG] Payment header:", paymentHeader);
 
-      // Call onSuccess immediately - the parent will handle facilitator verification
       if (onSuccess) onSuccess(paymentHeader);
     },
     [onSuccess]
@@ -84,14 +104,12 @@ export default function EvmPaymentHandler({
       const errMsg = err instanceof Error ? err.message : String(err);
       console.log("[DEBUG] Payment error", {errMsg});
 
-      // Check if this is a user cancellation
       const isUserCancellation =
         errMsg.includes("cancelled by user") ||
         errMsg.includes("User rejected");
 
       if (isUserCancellation) {
         console.log("[DEBUG] User cancelled payment");
-        // Set status to error so the error message is displayed
         setPaymentStatus("error");
         setErrorMessage("Transaction cancelled by user");
       } else {
@@ -99,7 +117,6 @@ export default function EvmPaymentHandler({
         setErrorMessage(errMsg);
       }
 
-      // Always reset payment tracking
       paymentAttemptRef.current.attemptInProgress = false;
 
       if (onError) onError(err instanceof Error ? err : new Error(errMsg));
@@ -108,20 +125,29 @@ export default function EvmPaymentHandler({
   );
 
   const handlePaymentProcessing = useCallback(() => {
-    console.log("[DEBUG] Payment processing started");
     setPaymentStatus("processing");
-    // Mark payment as in progress
     paymentAttemptRef.current.attemptInProgress = true;
   }, [setPaymentStatus]);
 
-  // Determine if the button is disabled
-  const isDisabled = ["connecting", "processing", "success"].includes(
-    paymentStatus
-  );
+  const isDisabled = 
+    ["connecting", "processing", "success"].includes(paymentStatus) || 
+    (!connectedAddress && !selectedWallet);
 
   return (
-    <div className="flex flex-col w-full">
-      {/* Payment processor component that watches for wallet connection and status */}
+    <div className="flex flex-col w-full space-y-4">
+        <EvmWalletSelector
+          chainId={networkId}
+          onWalletSelect={handleWalletSelect}
+          selectedWallet={selectedWallet}
+          disabled={paymentStatus === "connecting"}
+        />
+
+      {/* {errorMessage && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-700 text-sm">{errorMessage}</p>
+        </div>
+      )} */}
+
       {connectedAddress &&
         walletClient &&
         paymentStatus === "approving" &&
@@ -134,6 +160,7 @@ export default function EvmPaymentHandler({
             onError={handlePaymentError}
             onProcessing={handlePaymentProcessing}
             paymentAttemptRef={paymentAttemptRef}
+            networkId={networkId}
           />
         )}
 
@@ -148,7 +175,6 @@ export default function EvmPaymentHandler({
   );
 }
 
-// Payment processor component for EVM wallets
 function EvmPaymentProcessor({
                                walletClient,
                                connectedAddress,
@@ -157,31 +183,21 @@ function EvmPaymentProcessor({
                                onError,
                                onProcessing,
                                paymentAttemptRef,
+                               networkId = "bsc",
                              }) {
-  // Debug - Track if this component has already attempted a payment
   const hasAttemptedRef = useRef(false);
 
-  // Process payment on mount
   useEffect(() => {
-    console.log("[DEBUG] EvmPaymentProcessor mounted", {
-      connectedAddress: connectedAddress?.slice(0, 8),
-      hasAttempted: hasAttemptedRef.current,
-      attemptInProgress: paymentAttemptRef.current?.attemptInProgress,
-    });
 
-    // Guard against multiple attempts
     if (
       hasAttemptedRef.current ||
       (paymentAttemptRef.current && paymentAttemptRef.current.attemptInProgress)
     ) {
-      console.log("[DEBUG] Payment already in progress or attempted, skipping");
       return;
     }
 
-    // Mark as attempted at the component level
     hasAttemptedRef.current = true;
 
-    // Call processing callback - this will update the parent's ref
     onProcessing();
 
     const processPayment = async () => {
@@ -190,53 +206,52 @@ function EvmPaymentProcessor({
           throw new Error("EVM wallet client not available");
         }
 
-        // Set the appropriate namespace and networkId for EVM
+        const getChainId = (network) => {
+          switch (network) {
+            case "bsc":
+              return "56";
+            case "base":
+              return "8453";
+            default:
+              return "56";
+          }
+        };
+
+        const currentChainId = await walletClient.getChainId();
+        const expectedChainId = parseInt(getChainId(networkId));
+        
+        
+        if (currentChainId !== expectedChainId) {
+          throw new Error(`Wallet is on wrong network. Please switch to ${networkId.toUpperCase()} network and try again.`);
+        }
+
         const finalPaymentRequirements = {
           ...paymentRequirements,
           namespace: "evm",
-          networkId: "56", // BSC mainnet
+          networkId: getChainId(networkId),
           scheme: "exact",
-          resource: paymentRequirements.resource || "payment", // Use provided resource or default
+          resource: paymentRequirements.resource || "payment",
         };
-
-        console.log("[DEBUG] Final EVM payment details:", {
-          namespace: finalPaymentRequirements.namespace,
-          networkId: finalPaymentRequirements.networkId,
-          scheme: finalPaymentRequirements.scheme,
-          tokenAddress: finalPaymentRequirements.tokenAddress,
-          amountRequired: finalPaymentRequirements.amountRequired,
-        });
 
         const paymentClients = {
           evmClient: walletClient,
         };
 
-        console.log("[DEBUG] Calling createPayment for EVM");
-
-        // Create payment using the h402 payment library
         const paymentHeader = await createPaymentHeader(
           paymentClients,
           h402Version,
         finalPaymentRequirements,
         );
-        console.log("[DEBUG] createPayment succeeded");
         onSuccess(paymentHeader);
       } catch (err) {
-        console.error("[DEBUG] Payment error:", err);
 
-        // Check if this is a user rejection
         const errorMessage = err instanceof Error ? err.message : String(err);
-        console.log("[DEBUG] Error message:", errorMessage);
 
         const isUserRejection = errorMessage.includes(
           "User rejected the request"
         );
-        console.log("[DEBUG] Is user rejection:", isUserRejection);
 
         if (isUserRejection) {
-          console.log(
-            "[DEBUG] Transaction was rejected by user, handling gracefully"
-          );
           onError(new Error("Transaction cancelled by user"));
         } else {
           onError(err instanceof Error ? err : new Error(String(err)));
@@ -253,8 +268,8 @@ function EvmPaymentProcessor({
     onError,
     onProcessing,
     paymentAttemptRef,
+    networkId,
   ]);
 
-  // This component doesn't render anything
   return null;
 }

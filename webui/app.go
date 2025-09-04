@@ -2896,7 +2896,7 @@ func (a *App) GetUsage() func(c *fiber.Ctx) error {
 	}
 }
 
-func (a *App) SubmitSignedTransaction() func(c *fiber.Ctx) error {
+func (a *App) SubmitPaymentHeader() func(c *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		userIDStr, ok := c.Locals("id").(string)
 		if !ok || userIDStr == "" {
@@ -2914,8 +2914,8 @@ func (a *App) SubmitSignedTransaction() func(c *fiber.Ctx) error {
 		}
 
 		var payload struct {
-			SignedTransaction string `json:"signedTransaction"`
 			SelectedRequestID string `json:"selectedRequestID"`
+			PaymentHeader     string `json:"paymentHeader"`
 			Status            string `json:"status"`
 		}
 
@@ -2931,7 +2931,6 @@ func (a *App) SubmitSignedTransaction() func(c *fiber.Ctx) error {
 
 		var responseMessage string
 		var responseStatus string
-		var selectedRequestID uuid.UUID
 
 		if payload.Status == "CANCELLED" {
 			if err := db.DB.Model(&request).Updates(map[string]interface{}{
@@ -2942,21 +2941,23 @@ func (a *App) SubmitSignedTransaction() func(c *fiber.Ctx) error {
 			responseMessage = "Signed transaction submitted for cancelled request"
 			responseStatus = "CANCELLED"
 		} else {
+
+			if payload.PaymentHeader == "" {
+				return errorJSONMessage(c, "Signed transaction is required")
+			}
+
 			if payload.SelectedRequestID == "" {
 				return errorJSONMessage(c, "Selected request ID is required")
 			}
 
 			selectedRequestID, err := uuid.Parse(payload.SelectedRequestID)
+
 			if err != nil {
 				return errorJSONMessage(c, "Invalid selected request ID format")
 			}
 
-			if payload.SignedTransaction == "" {
-				return errorJSONMessage(c, "Signed transaction is required")
-			}
-
 			if err := db.DB.Model(&request).Updates(map[string]interface{}{
-				"SignedTransaction": payload.SignedTransaction,
+				"PaymentHeader":     payload.PaymentHeader,
 				"SelectedRequestID": selectedRequestID,
 				"Status":            "APPROVED",
 			}).Error; err != nil {
@@ -2971,7 +2972,8 @@ func (a *App) SubmitSignedTransaction() func(c *fiber.Ctx) error {
 			"message": responseMessage,
 			"data": fiber.Map{
 				"requestId":         requestID.String(),
-				"selectedRequestID": selectedRequestID.String(),
+				"selectedRequestID": payload.SelectedRequestID,
+				"paymentHeader":     payload.PaymentHeader,
 				"status":            responseStatus,
 			},
 		})

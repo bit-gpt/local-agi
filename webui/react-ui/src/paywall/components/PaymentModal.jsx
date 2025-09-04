@@ -1,11 +1,11 @@
 import React from "react";
 import Paywall from "./Paywall";
 
-const PaymentModal = ({ isOpen, onClose, paymentRequirements }) => {
+const PaymentModal = ({ isOpen, onClose, paymentRequirements, onPaymentSuccess }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Pay from your Wallet</h3>
@@ -15,31 +15,8 @@ const PaymentModal = ({ isOpen, onClose, paymentRequirements }) => {
         </div>
 
         <div className="modal-body">
-          <Paywall paymentRequirements={paymentRequirements} />
+          <Paywall paymentRequirements={paymentRequirements} onPaymentSuccess={onPaymentSuccess} />
         </div>
-
-        {/* <div className="modal-footer">
-          <div className="modal-actions">
-            <button
-              type="button"
-              className="action-btn"
-              onClick={onClose}
-              disabled={loading}
-            >
-              <i className="fas fa-times"></i>
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="action-btn"
-              onClick={handleSave}
-              disabled={loading}
-            >
-              <i className="fas fa-save"></i>{" "}
-              {loading ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
-        </div> */}
       </div>
     </div>
   );

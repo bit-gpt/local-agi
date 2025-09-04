@@ -1,17 +1,50 @@
-
 import BscNetwork from "/coins/bnb.svg";
 import SolanaNetwork from "/coins/sol.svg";
 import SolCoin from "/coins/sol.svg";
 import BnbCoin from "/coins/bnb.svg";
 import UsdcCoin from "/coins/usdc.svg";
 import UsdtCoin from "/coins/usdt.svg";
+import EthCoin from "/coins/eth.svg";
+import BaseNetwork from "/coins/base.svg";
+
+/**
+ * Get the appropriate coin icon based on token symbol
+ */
+function getCoinIcon(tokenSymbol) {
+  switch (tokenSymbol) {
+    case "BNB":
+      return BnbCoin;
+    case "SOL":
+      return SolCoin;
+    case "USDC":
+      return UsdcCoin;
+    case "USDT":
+      return UsdtCoin;
+    case "ETH":
+      return EthCoin;
+    default:
+      return "";
+  }
+}
+
+/**
+ * Create a coin object from a payment requirement
+ */
+function createCoinFromRequirement(requirement) {
+  const tokenSymbol = requirement.tokenSymbol || "Missing token metadata";
+  
+  return {
+    id: requirement.tokenAddress || "",
+    name: tokenSymbol,
+    icon: getCoinIcon(tokenSymbol),
+    paymentMethod: requirement,
+  };
+}
 
 /**
  * Converts payment details to array if needed
  */
-export function normalizePaymentMethods(
-  paymentRequirements
-) {
+export function normalizePaymentMethods(paymentRequirements) {
   if (!paymentRequirements) return [];
 
   return Array.isArray(paymentRequirements)
@@ -25,17 +58,18 @@ export function normalizePaymentMethods(
 export function getCompatiblePaymentRequirements(
   paymentRequirements,
   networkId
-){
+) {
   if (!paymentRequirements.length) {
     return [];
   }
 
-  // Filter methods by matching networkId
   const compatibleMethods = paymentRequirements.filter((requirement) => {
     if (networkId === "solana") {
       return requirement.namespace === "solana";
     } else if (networkId === "bsc") {
-      return requirement.networkId === "56"; // BSC mainnet chain ID
+      return requirement.networkId === "56"; 
+    } else if (networkId === "base") {
+      return requirement.networkId === "8453"; 
     }
     return false;
   });
@@ -45,10 +79,7 @@ export function getCompatiblePaymentRequirements(
 /**
  * Generate network and coin options from payment requirements
  */
-export function generateAvailableNetworks(
-  paymentRequirements
-){
-  // Group payment methods by network
+export function generateAvailableNetworks(paymentRequirements) {
   const networkGroups = {};
 
   paymentRequirements.forEach((requirement) => {
@@ -59,87 +90,69 @@ export function generateAvailableNetworks(
     networkGroups[networkId].push(requirement);
   });
 
-  // Map to network structure
   const networks = [];
-  let icon;
+  let containsBSC = false;
+  let containsBASE = false;
 
-  // Handle EVM networks
   if (networkGroups["evm"] && networkGroups["evm"].length > 0) {
-    const evmCoins = networkGroups["evm"].map((requirement) => {
-      // Determine coin type from token type and address
-      const isNative =
-        requirement.tokenAddress ===
-        "0x0000000000000000000000000000000000000000";
-      const tokenSymbol =
-        requirement.tokenSymbol ||
-        (isNative ? "BNB" : "Missing token metadata");
-
-      switch (tokenSymbol) {
-        case "BNB":
-          icon = BnbCoin;
-          break;
-        case "SOL":
-          icon = SolCoin;
-          break;
-        case "USDC":
-          icon = UsdcCoin;
-          break;
-        case "USDT":
-          icon = UsdtCoin;
-          break;
-        default:
-          icon = "";
+    networkGroups["evm"].forEach((requirement) => {
+      if (
+        containsBSC === false &&
+        (requirement.networkId === "56")
+      ) {
+        containsBSC = true;
       }
 
-      return {
-        id: requirement.tokenAddress || "",
-        name: tokenSymbol,
-        icon: icon,
-        paymentMethod: requirement, // Store the original payment method for reference
-      };
+      if (
+        containsBASE === false &&
+        (requirement.networkId === "8453")
+      ) {
+        containsBASE = true;
+      }
     });
 
-    networks.push({
-      id: "bsc",
-      name: "Binance Smart Chain",
-      icon: BscNetwork,
-      coins: evmCoins,
-    });
+    if (containsBSC) {
+      const bscCoins = networkGroups["evm"]
+        .filter((requirement) => 
+          requirement.networkId === "56"
+        )
+        .map(createCoinFromRequirement);
+
+      networks.push({
+        id: "bsc",
+        name: "Binance Smart Chain",
+        icon: BscNetwork,
+        coins: bscCoins,
+      });
+    }
+
+    if (containsBASE) {
+      const baseCoins = networkGroups["evm"]
+        .filter((requirement) => 
+          requirement.networkId === "8453"
+        )
+        .map(createCoinFromRequirement);
+
+      networks.push({
+        id: "base",
+        name: "Base",
+        icon: BaseNetwork,
+        coins: baseCoins,
+      });
+    }
   }
 
-  // Handle Solana networks
   if (networkGroups["solana"] && networkGroups["solana"].length > 0) {
     const solanaCoins = networkGroups["solana"].map((requirement) => {
-      // Determine coin type from token type and address
-      const isNative =
-        requirement.tokenAddress === "11111111111111111111111111111111";
-      const tokenSymbol =
-        requirement.tokenSymbol ||
-        (isNative ? "SOL" : "Missing token metadata");
-
-      switch (tokenSymbol) {
-        case "BNB":
-          icon = BnbCoin;
-          break;
-        case "SOL":
-          icon = SolCoin;
-          break;
-        case "USDC":
-          icon = UsdcCoin;
-          break;
-        case "USDT":
-          icon = UsdtCoin;
-          break;
-        default:
-          icon = "";
-      }
-
-      return {
-        id: requirement.tokenAddress || "",
-        name: tokenSymbol,
-        icon: icon,
-        paymentMethod: requirement, // Store the original payment method for reference
+      const isNative = requirement.tokenAddress === "11111111111111111111111111111111";
+      const tokenSymbol = requirement.tokenSymbol || (isNative ? "SOL" : "Missing token metadata");
+      
+      const modifiedRequirement = {
+        ...requirement,
+        tokenSymbol: tokenSymbol
       };
+      
+      return createCoinFromRequirement(modifiedRequirement);
     });
 
     networks.push({

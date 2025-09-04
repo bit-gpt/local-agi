@@ -1,8 +1,10 @@
-import {useCallback, useEffect, useRef, useState} from "react";
+import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {useWalletAccountTransactionSendingSigner, useWalletAccountTransactionSigner} from "@solana/react";
 import {useConnect} from "@wallet-standard/react";
 import {createPaymentHeader, h402Version} from "@bit-gpt/h402";
 import PaymentButtonUI from "../../components/PaymentButton";
+import SolanaWalletSelector from "./SolanaWalletSelector";
+import { useSolanaWallets } from "../hooks/useSolanaWallets";
 
 /**
  * Solana-specific payment handler
@@ -10,7 +12,6 @@ import PaymentButtonUI from "../../components/PaymentButton";
  */
 export default function SolanaPaymentHandler({
   amount,
-  wallet,
   paymentRequirements,
   onSuccess,
   onError,
@@ -19,25 +20,37 @@ export default function SolanaPaymentHandler({
   className = "",
 }) {
   const [errorMessage, setErrorMessage] = useState(null);
-  const [selectedAccount, setSelectedAccount] =
-    useState(null);
+  
+  // Use the custom hook for Solana wallet management
+  const { selectedWallet, selectedWalletAccount, setSelectedWalletAccount } = useSolanaWallets();
 
   // Simplified ref to track payment attempts
   const paymentAttemptRef = useRef({attemptInProgress: false});
 
-  // Get the wallet connection hook
-  const [isConnecting, connect] = useConnect(wallet);
+  console.log("[DEBUG] selectedWalletSSSSSSSS", selectedWallet);
+
+  // Handle wallet selection
+  const handleWalletSelect = (wallet) => {
+    // Set the first account from the selected wallet
+    const firstAccount = wallet?.accounts?.[0];
+    setSelectedWalletAccount(firstAccount);
+  };
 
   // Handle button click for unified experience
   // If no account, connect first
   // If already connected, start processing payment
   const handleButtonClick = async () => {
     console.log("[DEBUG] Button clicked", {
-      selectedAccountAddress: selectedAccount?.address,
+      selectedAccountAddress: selectedWalletAccount?.address,
       currentStatus: paymentStatus,
     });
-    // If no account, connect first
-    if (!selectedAccount) {
+    // If not connected, prompt user to select a wallet
+    if (!selectedWalletAccount) {
+      if (!selectedWallet) {
+        setErrorMessage("Please select a wallet to connect");
+        return;
+      }
+      // If wallet is selected but not connected, try to connect
       await handleConnectWallet();
       return;
     }
@@ -54,13 +67,13 @@ export default function SolanaPaymentHandler({
       console.log("[DEBUG] Connecting wallet");
       // Use existing accounts if available, otherwise connect to get accounts
       const accounts =
-        wallet.accounts.length > 0 ? wallet.accounts : await connect();
+        selectedWallet?.accounts?.length > 0 ? selectedWallet.accounts : await connectFunction();
       console.log("[DEBUG] Retrieved accounts", accounts?.length);
       if (!accounts || accounts.length === 0) {
         throw new Error("No accounts available");
       }
-      setSelectedAccount(accounts[0]);
-      // Set the status to approving to show tx approval in walet
+      setSelectedWalletAccount(accounts[0]);
+      // Set the status to approving to show tx approval in wallet
       setPaymentStatus("approving");
     } catch (err) {
       console.error("[DEBUG] Wallet connection error:", err);
@@ -133,16 +146,38 @@ export default function SolanaPaymentHandler({
 
   // Determine if the button is disabled
   const isDisabled =
-    isConnecting || ["processing", "success"].includes(paymentStatus);
+    ["processing", "success"].includes(paymentStatus) ||
+    (!selectedWalletAccount && !selectedWallet); // Disable if no wallet selected and not connected
 
   return (
-    <div className="flex flex-col w-full">
+    <div className="flex flex-col w-full space-y-4">
+      {/* Wallet Selector - Always visible */}
+      <SolanaWalletSelector
+        onWalletSelect={handleWalletSelect}
+        selectedWallet={selectedWallet}
+        disabled={paymentStatus === "connecting"}
+      />
+
+      {/* Error Message */}
+      {/* {errorMessage && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-700 text-sm">{errorMessage}</p>
+        </div>
+      )} */}
+
+      {/* Wallet Connection Manager - conditionally rendered */}
+      {selectedWallet && (
+        <WalletConnectionManager
+          wallet={selectedWallet}
+        />
+      )}
+
       {/* Payment processor component that watches for account and status */}
-      {selectedAccount &&
+      {selectedWalletAccount &&
         paymentStatus === "approving" &&
         !paymentAttemptRef.current.attemptInProgress && (
           <SolanaPaymentProcessor
-            account={selectedAccount}
+            account={selectedWalletAccount}
             paymentRequirements={paymentRequirements}
             onSuccess={handlePaymentSuccess}
             onError={handlePaymentError}
@@ -275,6 +310,14 @@ function SolanaPaymentProcessor({
     };
   }, [account, paymentRequirements, transactionSendingSigner, onSuccess, onError, onProcessing, paymentAttemptRef, transactionSigner?.modifyAndSignTransactions]);
 
+  // This component doesn't render anything
+  return null;
+}
+
+// Separate component to handle wallet connection hook
+function WalletConnectionManager({ wallet }) {
+  const [isConnecting, connect] = useConnect(wallet);
+  
   // This component doesn't render anything
   return null;
 }

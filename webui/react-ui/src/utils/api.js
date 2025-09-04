@@ -194,9 +194,9 @@ export const agentApi = {
     return handleResponse(response);
   },
 
-  submitSignedTransaction: async (name, requestId, body) => {
+  submitPaymentHeader: async (name, requestId, body) => {
     const response = await fetch(
-      buildUrl(API_CONFIG.endpoints.submitSignedTransaction(name, requestId)),
+      buildUrl(API_CONFIG.endpoints.submitPaymentHeader(name, requestId)),
       {
         method: "PUT",
         headers: API_CONFIG.headers,

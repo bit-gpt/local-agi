@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,10 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rlp"
-	bin "github.com/gagliardetto/binary"
-	"github.com/gagliardetto/solana-go"
 	"github.com/google/uuid"
 	"github.com/mudler/LocalAGI/core/sse"
 	"github.com/mudler/LocalAGI/core/state"
@@ -405,7 +400,7 @@ func (h *H402Client) SendH402RequestWithPaymentInfoAndWalletConnection(ctx conte
 		return nil, fmt.Errorf("failed to create h402 request: %v", err)
 	}
 
-	selectedRequestID, paymentTx, err := h.waitForSignedTransaction(ctx, requestID, paymentRequests)
+	selectedRequestID, paymentHeader, err := h.waitForPaymentHeader(ctx, requestID, paymentRequests)
 
 	if err != nil {
 		return &H402ResponseWithPaymentInfo{
@@ -415,6 +410,7 @@ func (h *H402Client) SendH402RequestWithPaymentInfoAndWalletConnection(ctx conte
 	}
 
 	var paymentReq H402PaymentRequirement
+
 	var found bool
 	for _, req := range paymentRequests {
 		if req["selectedRequestID"].(string) == selectedRequestID.String() {
@@ -443,54 +439,12 @@ func (h *H402Client) SendH402RequestWithPaymentInfoAndWalletConnection(ctx conte
 		return nil, fmt.Errorf("failed to map network ID to wallet type: %v", err)
 	}
 
-	var signature string
-	if paymentTx != nil {
-		var err error
-		signature, err = h.extractSignatureFromTransaction(*paymentTx, walletType)
-		if err != nil {
-			return &H402ResponseWithPaymentInfo{
-				Response:  resp,
-				InfoError: fmt.Errorf("failed to extract signature from transaction: %v", err),
-			}, nil
-		}
-	}
-
-	payload := H402PaymentPayload{
-		Type:      GetPaymentType(walletType),
-		Signature: signature,
-	}
-
-	if walletType == coretypes.ServerWalletTypeBNB || walletType == coretypes.ServerWalletTypeBASE {
-		if paymentTx != nil {
-			payload.SignedTransaction = *paymentTx
-		}
-	} else {
-		if paymentTx != nil {
-			payload.Transaction = *paymentTx
-		}
-	}
-
-	payment := H402Payment{
-		H402Version: 1,
-		Scheme:      paymentReq.Scheme,
-		Namespace:   paymentReq.Namespace,
-		NetworkID:   paymentReq.NetworkID,
-		Resource:    paymentReq.Resource,
-		Payload:     payload,
-	}
-
-	paymentJSON, err := json.Marshal(payment)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal payment: %v", err)
-	}
-	paymentBase64 := base64.StdEncoding.EncodeToString(paymentJSON)
-
 	req2, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payment request: %v", err)
 	}
 	req2.Header.Set("Content-Type", "application/json")
-	req2.Header.Set("X-PAYMENT", paymentBase64)
+	req2.Header.Set("X-PAYMENT", *paymentHeader)
 	req2.Header.Set("Access-Control-Expose-Headers", "X-PAYMENT-RESPONSE")
 
 	fmt.Println("Final Payment request:", req2)
@@ -507,7 +461,7 @@ func (h *H402Client) SendH402RequestWithPaymentInfoAndWalletConnection(ctx conte
 		Amount:       paymentReq.AmountRequired,
 		AmountFormat: paymentReq.AmountRequiredFormat,
 		WalletType:   string(walletType),
-		Transaction:  *paymentTx,
+		Transaction:  *paymentHeader,
 		Namespace:    paymentReq.Namespace,
 		TokenAddress: paymentReq.TokenAddress,
 	}
@@ -650,6 +604,28 @@ func FormatPaymentMessage(paymentInfo *PaymentInfo) string {
 
 	return fmt.Sprintf("Please mention this at the start of your next response: **You have paid %s %s from the %s server wallet to access this page.**",
 		amountStr, currency, walletName)
+}
+
+func FormatPaymentMessageWalletConnection(paymentInfo *PaymentInfo) string {
+	if paymentInfo == nil {
+		return ""
+	}
+
+	currency := detectTokenSymbolFromChainConfig(paymentInfo.TokenAddress, paymentInfo.WalletType)
+
+	var displayAmount float64
+	if paymentInfo.AmountFormat == "smallestUnit" {
+		displayAmount = convertSmallestUnitToHumanReadable(paymentInfo.Amount, paymentInfo.TokenAddress, paymentInfo.WalletType)
+	} else {
+		displayAmount = paymentInfo.Amount
+	}
+
+	decimals := getDecimalsForToken(paymentInfo.TokenAddress, paymentInfo.WalletType)
+
+	amountStr := formatAmountWithPrecision(displayAmount, decimals)
+
+	return fmt.Sprintf("Please mention this at the start of your next response: **You have paid %s %s to access this page.**",
+		amountStr, currency)
 }
 
 func FormatPayLimitMessage(payLimitError *PayLimitError) string {
@@ -809,7 +785,7 @@ func (h *H402Client) getAgentPayLimitStatus() (string, error) {
 	return payLimitStatus, nil
 }
 
-func (h *H402Client) waitForSignedTransaction(ctx context.Context, requestID uuid.UUID, paymentRequests []map[string]interface{}) (uuid.UUID, *string, error) {
+func (h *H402Client) waitForPaymentHeader(ctx context.Context, requestID uuid.UUID, paymentRequests []map[string]interface{}) (uuid.UUID, *string, error) {
 
 	if h.pool != nil {
 		if agentPool, ok := h.pool.(*state.AgentPool); ok {
@@ -829,12 +805,12 @@ func (h *H402Client) waitForSignedTransaction(ctx context.Context, requestID uui
 				}
 
 				manager.Send(
-					sse.NewMessage(string(paymentRequestsData)).WithEvent("request_signed_transaction"))
+					sse.NewMessage(string(paymentRequestsData)).WithEvent("request_payment_header"))
 			}
 		}
 	}
 
-	fmt.Printf("Waiting for signed transaction for request %s (agent %s)...\n", requestID, h.agentID)
+	fmt.Printf("Waiting for payment header for request %s (agent %s)...\n", requestID, h.agentID)
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
@@ -848,21 +824,21 @@ func (h *H402Client) waitForSignedTransaction(ctx context.Context, requestID uui
 			if err := h.setH402RequestStatus(requestID, "CANCELLED"); err != nil {
 				fmt.Printf("Failed to set request status to cancelled after timeout: %v\n", err)
 			}
-			fmt.Printf("Signed transaction timeout for request %s, setting status=Cancelled\n", requestID)
-			return uuid.Nil, nil, fmt.Errorf("signed transaction timeout")
+			fmt.Printf("Payment header timeout for request %s, setting status=Cancelled\n", requestID)
+			return uuid.Nil, nil, fmt.Errorf("payment header timeout")
 		case <-ticker.C:
-			selectedRequestID, signedTx, status, err := h.getH402RequestSignedTransaction(requestID)
+			selectedRequestID, paymentHeader, status, err := h.getH402RequestPaymentHeader(requestID)
 			if err != nil {
-				fmt.Printf("Error checking signed transaction status: %v\n", err)
+				fmt.Printf("Error checking payment header status: %v\n", err)
 				continue
 			}
-			if status == "APPROVED" && selectedRequestID != nil && signedTx != nil {
-				fmt.Printf("Signed transaction approved for request %s\n", requestID)
-				return *selectedRequestID, signedTx, nil
+			if status == "APPROVED" && selectedRequestID != uuid.Nil && paymentHeader != nil {
+				fmt.Printf("Payment header approved for request %s\n", requestID)
+				return selectedRequestID, paymentHeader, nil
 			}
 			if status == "CANCELLED" {
-				fmt.Printf("Signed transaction cancelled for request %s\n", requestID)
-				return uuid.Nil, nil, fmt.Errorf("signed transaction cancelled")
+				fmt.Printf("Payment header cancelled for request %s\n", requestID)
+				return uuid.Nil, nil, fmt.Errorf("payment header cancelled")
 			}
 		}
 	}
@@ -879,53 +855,13 @@ func (h *H402Client) setH402RequestStatus(requestID uuid.UUID, status string) er
 	return nil
 }
 
-func (h *H402Client) getH402RequestSignedTransaction(requestID uuid.UUID) (*uuid.UUID, *string, string, error) {
+func (h *H402Client) getH402RequestPaymentHeader(requestID uuid.UUID) (uuid.UUID, *string, string, error) {
 	var request models.H402PendingRequests
 	if err := db.DB.Where("ID = ?", requestID).First(&request).Error; err != nil {
-		return nil, nil, "", err
+		return uuid.Nil, nil, "", err
 	}
-	return request.SelectedRequestID, request.SignedTransaction, request.Status, nil
-}
-
-func (h *H402Client) extractSignatureFromTransaction(signedTx string, walletType coretypes.ServerWalletType) (string, error) {
-	if walletType == coretypes.ServerWalletTypeBNB || walletType == coretypes.ServerWalletTypeBASE {
-		return h.extractEVMSignature(signedTx)
-	} else if walletType == coretypes.ServerWalletTypeSOL {
-		return h.extractSolanaSignature(signedTx)
+	if request.SelectedRequestID == nil {
+		return uuid.Nil, nil, request.Status, nil
 	}
-	return "", fmt.Errorf("unsupported wallet type for signature extraction: %s", walletType)
-}
-
-func (h *H402Client) extractEVMSignature(signedTxHex string) (string, error) {
-	signedTxHex = strings.TrimPrefix(signedTxHex, "0x")
-
-	signedTxBytes, err := hex.DecodeString(signedTxHex)
-	if err != nil {
-		return "", fmt.Errorf("failed to decode signed transaction hex: %v", err)
-	}
-
-	var tx types.Transaction
-	if err := rlp.DecodeBytes(signedTxBytes, &tx); err != nil {
-		return "", fmt.Errorf("failed to decode signed transaction: %v", err)
-	}
-
-	return tx.Hash().Hex(), nil
-}
-
-func (h *H402Client) extractSolanaSignature(signedTxBase64 string) (string, error) {
-	signedTxBytes, err := base64.StdEncoding.DecodeString(signedTxBase64)
-	if err != nil {
-		return "", fmt.Errorf("failed to decode signed transaction base64: %v", err)
-	}
-
-	tx, err := solana.TransactionFromDecoder(bin.NewBinDecoder(signedTxBytes))
-	if err != nil {
-		return "", fmt.Errorf("failed to decode Solana transaction: %v", err)
-	}
-
-	if len(tx.Signatures) == 0 {
-		return "", fmt.Errorf("no signatures found in transaction")
-	}
-
-	return tx.Signatures[0].String(), nil
+	return *request.SelectedRequestID, request.PaymentHeader, request.Status, nil
 }

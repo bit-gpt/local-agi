@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useWallets } from "@wallet-standard/react";
 import { useEvmWallet } from "@/paywall/evm/context/EvmWalletContext";
 import {
   generateAvailableNetworks,
@@ -12,7 +11,6 @@ import {
   NoPaymentOptions,
 } from "@/paywall/components/PaywallComponents";
 import { useWalletDetection } from "@/paywall/hooks/useWalletDetection";
-import { useCompatibleWallet } from "@/paywall/hooks/useCompatibleWallet";
 import SolanaPaymentHandler from "@/paywall/solana/components/SolanaPaymentHandler";
 import EvmPaymentHandler from "@/paywall/evm/components/EvmPaymentHandler";
 import { formatAmountForDisplay } from "@/paywall/utils/amountFormatting";
@@ -22,8 +20,7 @@ import { useOutletContext } from "react-router-dom";
  * Payment UI component with network/coin selection
  * and integrated payment button
  */
-export default function PaymentUI({ paymentRequirements }) {
-  const wallets = useWallets();
+export default function PaymentUI({ paymentRequirements, onPaymentSuccess }) {
   const { connectedAddress: evmAddress } = useEvmWallet();
   const { isTrueEvmProvider } = useWalletDetection(evmAddress);
   const [paymentStatus, setPaymentStatus] = useState("idle");
@@ -66,12 +63,6 @@ export default function PaymentUI({ paymentRequirements }) {
   const [selectedPaymentMethodIndex, setSelectedPaymentMethodIndex] =
     useState(0);
 
-  // Get compatible wallet
-  const { selectedWallet } = useCompatibleWallet(
-    selectedNetwork,
-    wallets,
-    isTrueEvmProvider
-  );
 
   // Reset payment method index when network changes and update selected network
   useEffect(() => {
@@ -122,6 +113,7 @@ export default function PaymentUI({ paymentRequirements }) {
       "[DEBUG-PAYMENT-FLOW] No exact match found, using first compatible method"
     );
     setActivePaymentRequirements(compatibleMethods[0]);
+
   }, [
     paymentMethods,
     selectedPaymentMethodIndex,
@@ -137,6 +129,9 @@ export default function PaymentUI({ paymentRequirements }) {
     console.log("Completing payment flow...");
 
     console.log("Payment header:", paymentHeader);
+    console.log("Selected request ID:", activePaymentRequirements);
+    
+    onPaymentSuccess(paymentHeader, activePaymentRequirements.selectedRequestID);
   };
 
   const handlePaymentError = (error) => {
@@ -172,32 +167,16 @@ export default function PaymentUI({ paymentRequirements }) {
       activePaymentRequirements.namespace ===
       (selectedNetwork.id === "solana" ? "solana" : "evm");
 
-    // For Solana, we need to check for a compatible wallet
-    if (selectedNetwork.id === "solana" && !selectedWallet) {
-      return (
-        <ErrorMessage
-          message="No compatible Solana wallet found. Please install a supported wallet."
-        />
-      );
-    }
-
-    // For BSC/EVM, we need to check if a true EVM provider is available
-    if (selectedNetwork.id === "bsc" && !isTrueEvmProvider) {
-      return (
-        <ErrorMessage
-          message="No compatible EVM wallet found. Please install a supported wallet."
-        />
-      );
-    }
+    // Wallet compatibility is now handled by WalletSelector component in the payment handlers
 
     // Check if the payment method matches the selected network
-    if (!isValidMethod) {
-      return (
-        <ErrorMessage
-          message="Please select a valid payment method."
-        />
-      );
-    }
+    // if (!isValidMethod) {
+    //   return (
+    //     <ErrorMessage
+    //       message="Please select a valid payment method."
+    //     />
+    //   );
+    // }
 
     if (selectedNetwork.id === "solana") {
       return (
@@ -209,7 +188,6 @@ export default function PaymentUI({ paymentRequirements }) {
             symbol: selectedCoin.name,
             decimals: activePaymentRequirements.tokenDecimals,
           })}
-          wallet={selectedWallet}
           paymentRequirements={activePaymentRequirements}
           onSuccess={handlePaymentSuccess}
           onError={handlePaymentError}
@@ -217,7 +195,7 @@ export default function PaymentUI({ paymentRequirements }) {
           paymentStatus={paymentStatus}
         />
       );
-    } else if (selectedNetwork.id === "bsc") {
+    } else if (selectedNetwork.id === "bsc" || selectedNetwork.id === "base") {
       return (
         <EvmPaymentHandler
           amount={formatAmountForDisplay({
@@ -232,14 +210,13 @@ export default function PaymentUI({ paymentRequirements }) {
           onError={handlePaymentError}
           setPaymentStatus={setPaymentStatus}
           paymentStatus={paymentStatus}
+          networkId={selectedNetwork.id}
         />
       );
     }
 
     return null;
   };
-
-  console.log("PPPP", paymentRequirements);
 
   return (
     <div
@@ -272,6 +249,8 @@ export default function PaymentUI({ paymentRequirements }) {
               toggleDropdown={() => toggleDropdown("coin")}
             />
           )}
+
+          {/* Wallet Selection */}
 
           {/* Payment Button */}
           {renderPaymentButton()}

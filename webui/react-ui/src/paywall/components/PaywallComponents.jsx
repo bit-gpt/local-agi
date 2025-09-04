@@ -8,7 +8,7 @@ export const Dropdown = ({
 }) => {
   if (!selected.id) return null;
   return (
-    <div className="mb-4">
+    <div className="mb-[1.5rem]">
       <label className={"block text-sm font-medium mb-2 text-gray-700"}>
         {type === "network" ? "Network" : "Coin"}
       </label>
@@ -21,7 +21,7 @@ export const Dropdown = ({
           type="button"
         >
           <div className="flex items-center">
-            <div className="w-6 h-6 mr-2 flex-shrink-0">
+            <div className="w-6 h-6 max-w-6 max-h-6 mr-2 flex-shrink-0">
               <img
                 src={selected.icon}
                 alt={selected.name}
@@ -62,7 +62,7 @@ export const Dropdown = ({
                 }
                 onClick={() => onSelect(item)}
               >
-                <div className="w-6 h-6 mr-2 flex-shrink-0">
+                <div className="w-6 h-6 max-w-6 max-h-6 mr-2 flex-shrink-0">
                   <img
                     src={item.icon}
                     alt={item.name}
