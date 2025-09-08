@@ -9,7 +9,6 @@ import { SelectedWalletAccountContext } from "../context/SelectedWalletAccountCo
 export function useSolanaWallets() {
   const wallets = useWallets();
   const [selectedWalletAccount, setSelectedWalletAccount] = useContext(SelectedWalletAccountContext);
-
   // Filter wallets to only show Solana-compatible ones (memoized)
   const solanaWallets = useMemo(() => {
     return wallets.filter((wallet) => {

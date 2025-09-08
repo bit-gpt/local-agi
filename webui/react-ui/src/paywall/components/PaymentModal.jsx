@@ -1,7 +1,12 @@
 import React from "react";
 import Paywall from "./Paywall";
 
-const PaymentModal = ({ isOpen, onClose, paymentRequirements, onPaymentSuccess }) => {
+const PaymentModal = ({
+  isOpen,
+  onClose,
+  paymentRequirements,
+  onPaymentSuccess,
+}) => {
   if (!isOpen) return null;
 
   return (
@@ -15,7 +20,10 @@ const PaymentModal = ({ isOpen, onClose, paymentRequirements, onPaymentSuccess }
         </div>
 
         <div className="modal-body">
-          <Paywall paymentRequirements={paymentRequirements} onPaymentSuccess={onPaymentSuccess} />
+          <Paywall
+            paymentRequirements={paymentRequirements}
+            onPaymentSuccess={onPaymentSuccess}
+          />
         </div>
       </div>
     </div>

@@ -22,9 +22,10 @@ export function getConnector(walletType) {
     case "phantom":
       return injected({ shimDisconnect: true, target: "phantom" });
     case "trust":
+      return injected({ shimDisconnect: true, target: "trust" });
     case "walletconnect":
       return walletConnect({
-        projectId: "233c440b08a2b78d6b3e76370b979bed",
+        projectId: "3fbb6bba6f1de962d911bb5b5c9dba88",
       });
     default:
       return injected({ shimDisconnect: true });
@@ -38,7 +39,8 @@ export function getConnector(walletType) {
  */
 export function getChainConfig(networkId) {
   const targetChain = networkId === "base" ? base : bsc;
-  const networkName = networkId === "base" ? "Base" : "Binance Smart Chain (BSC)";
-  
+  const networkName =
+    networkId === "base" ? "Base" : "Binance Smart Chain (BSC)";
+
   return { targetChain, networkName };
 }

@@ -5,21 +5,19 @@ import { getWalletClient } from "@wagmi/core";
 import { config } from "../config/wagmi";
 import { getConnector, getChainConfig } from "../utils/connectorUtils";
 import { handleChainSwitch } from "../utils/chainUtils";
-import { 
-  getWalletErrorMessage, 
-  validateWalletEnvironment, 
+import {
+  validateWalletEnvironment,
   validateConnectionResult,
   validateWalletClient,
   validateWalletAddress,
-  validateChainId
+  validateChainId,
 } from "../utils/errorUtils";
+import { formatError } from "../../utils/errorFormatter";
 import { clearWalletStorage } from "../utils/storageUtils";
 
 const EvmWalletContext = createContext({
   walletClient: null,
   connectedAddress: "",
-  statusMessage: "",
-  setStatusMessage: () => {},
   connectWallet: async () => {},
   disconnectWallet: async () => {},
 });
@@ -29,34 +27,34 @@ export const useEvmWallet = () => useContext(EvmWalletContext);
 export function EvmWalletProvider({ children }) {
   const [walletClient, setWalletClient] = useState(null);
   const [connectedAddress, setConnectedAddress] = useState("");
-  const [statusMessage, setStatusMessage] = useState("");
 
   const connectWallet = useCallback(async (walletType, networkId = "bsc") => {
     const { targetChain, networkName } = getChainConfig(networkId);
-    
-    try {
-      setStatusMessage("Connecting wallet...");
+    console.log("Start Connecting", targetChain, networkName);
 
-      // Disconnect any existing wallet first to avoid conflicts
+    try {
       if (walletClient || connectedAddress) {
-        setStatusMessage("Disconnecting previous wallet...");
         try {
           await disconnect(config);
           clearWalletStorage();
         } catch (disconnectError) {
-          console.warn("Failed to disconnect previous wallet:", disconnectError);
+          console.warn(
+            "Failed to disconnect previous wallet:",
+            disconnectError
+          );
         }
-        // Clear local state
         setWalletClient(null);
         setConnectedAddress("");
       }
 
-      setStatusMessage("Connecting wallet...");
       validateWalletEnvironment();
 
       const connector = getConnector(walletType);
 
       let result = await connect(config, { connector });
+      console.log('conffiggg', config)
+      console.log('resulttt', result)
+      console.log('connector', connector)
       validateConnectionResult(result);
 
       const initialClient = await getWalletClient(config, {
@@ -68,11 +66,10 @@ export function EvmWalletProvider({ children }) {
         initialClient,
         targetChain,
         networkName,
-        setStatusMessage,
         config,
         account: result.accounts[0],
         connector,
-        result
+        result,
       });
 
       validateConnectionResult(result);
@@ -93,12 +90,9 @@ export function EvmWalletProvider({ children }) {
 
       setWalletClient(client);
       setConnectedAddress(address);
-      setStatusMessage("Wallet connected!");
-      
     } catch (error) {
-      console.error("EvmWalletContext - Connection error:", error);
-      const message = getWalletErrorMessage(error, networkName);
-      setStatusMessage(message);
+      const errorInfo = formatError(error, { networkName });
+      throw errorInfo.message;
     }
   }, []);
 
@@ -110,23 +104,18 @@ export function EvmWalletProvider({ children }) {
 
       setWalletClient(null);
       setConnectedAddress("");
-      setStatusMessage("Wallet disconnected");
 
       clearWalletStorage();
-      
     } catch (error) {
-      console.error("EvmWalletContext - Disconnect error:", error);
       setWalletClient(null);
       setConnectedAddress("");
-      setStatusMessage("Wallet disconnected (with errors)");
+      throw error;
     }
   }, []);
 
   const contextValue = {
     walletClient,
     connectedAddress,
-    statusMessage,
-    setStatusMessage,
     connectWallet,
     disconnectWallet,
   };

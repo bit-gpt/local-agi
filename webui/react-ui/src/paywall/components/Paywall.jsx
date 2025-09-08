@@ -7,10 +7,8 @@ import {
 } from "@/paywall/utils/paymentUtils";
 import {
   Dropdown,
-  ErrorMessage,
   NoPaymentOptions,
 } from "@/paywall/components/PaywallComponents";
-import { useWalletDetection } from "@/paywall/hooks/useWalletDetection";
 import SolanaPaymentHandler from "@/paywall/solana/components/SolanaPaymentHandler";
 import EvmPaymentHandler from "@/paywall/evm/components/EvmPaymentHandler";
 import { formatAmountForDisplay } from "@/paywall/utils/amountFormatting";
@@ -22,26 +20,22 @@ import { useOutletContext } from "react-router-dom";
  */
 export default function PaymentUI({ paymentRequirements, onPaymentSuccess }) {
   const { connectedAddress: evmAddress } = useEvmWallet();
-  const { isTrueEvmProvider } = useWalletDetection(evmAddress);
   const [paymentStatus, setPaymentStatus] = useState("idle");
   const [activePaymentRequirements, setActivePaymentRequirements] =
     useState(null);
 
   const { showToast } = useOutletContext();
 
-  // Convert payment details to array if needed
   const paymentMethods = useMemo(
     () => normalizePaymentMethods(paymentRequirements),
     [paymentRequirements]
   );
 
-  // Generate network and coin options from payment requirements
   const availableNetworks = useMemo(
     () => generateAvailableNetworks(paymentMethods),
     [paymentMethods]
   );
 
-  // State for selections - initialize with empty defaults
   const [selectedNetwork, setSelectedNetwork] = useState({
     id: "",
     name: "",
@@ -63,14 +57,10 @@ export default function PaymentUI({ paymentRequirements, onPaymentSuccess }) {
   const [selectedPaymentMethodIndex, setSelectedPaymentMethodIndex] =
     useState(0);
 
-
-  // Reset payment method index when network changes and update selected network
   useEffect(() => {
     setSelectedPaymentMethodIndex(0);
 
-    // If there are available networks
     if (availableNetworks.length > 0) {
-      // If the current network is not in the available networks list, select the first available one
       if (
         !availableNetworks.some((network) => network.id === selectedNetwork.id)
       ) {
@@ -80,40 +70,27 @@ export default function PaymentUI({ paymentRequirements, onPaymentSuccess }) {
     }
   }, [selectedNetwork.id, availableNetworks]);
 
-  // Get the active payment requirements based on selected coin
   useEffect(() => {
-    // Get compatible methods for the selected network
     const compatibleMethods = getCompatiblePaymentRequirements(
       paymentMethods,
       selectedNetwork.id
     );
 
     if (compatibleMethods.length === 0) {
-      console.log("[DEBUG-PAYMENT-FLOW] No compatible payment methods found");
       setActivePaymentRequirements(null);
       return;
     }
 
-    // Find a payment method matching the selected coin
     const matchingPaymentMethod = compatibleMethods.find(
       (method) => method.tokenSymbol === selectedCoin.name
     );
 
     if (matchingPaymentMethod) {
-      console.log(
-        "[DEBUG-PAYMENT-FLOW] Found matching payment method for coin:",
-        JSON.stringify(matchingPaymentMethod, null, 2)
-      );
       setActivePaymentRequirements(matchingPaymentMethod);
       return;
     }
 
-    // If no match found, use the first compatible method
-    console.log(
-      "[DEBUG-PAYMENT-FLOW] No exact match found, using first compatible method"
-    );
     setActivePaymentRequirements(compatibleMethods[0]);
-
   }, [
     paymentMethods,
     selectedPaymentMethodIndex,
@@ -121,23 +98,18 @@ export default function PaymentUI({ paymentRequirements, onPaymentSuccess }) {
     selectedCoin,
   ]);
 
-  // Event handlers
   const handlePaymentSuccess = async (paymentHeader) => {
-    // Set payment status to success
     setPaymentStatus("success");
 
-    console.log("Completing payment flow...");
-
-    console.log("Payment header:", paymentHeader);
-    console.log("Selected request ID:", activePaymentRequirements);
-    
-    onPaymentSuccess(paymentHeader, activePaymentRequirements.selectedRequestID);
+    onPaymentSuccess(
+      paymentHeader,
+      activePaymentRequirements.selectedRequestID
+    );
   };
 
   const handlePaymentError = (error) => {
     console.error("Payment failed:", error);
     showToast(error.message, "error");
-    // Could add toast notification here
   };
 
   const toggleDropdown = (dropdownName) => {
@@ -162,21 +134,6 @@ export default function PaymentUI({ paymentRequirements, onPaymentSuccess }) {
     if (!activePaymentRequirements) {
       return null;
     }
-
-    const isValidMethod =
-      activePaymentRequirements.namespace ===
-      (selectedNetwork.id === "solana" ? "solana" : "evm");
-
-    // Wallet compatibility is now handled by WalletSelector component in the payment handlers
-
-    // Check if the payment method matches the selected network
-    // if (!isValidMethod) {
-    //   return (
-    //     <ErrorMessage
-    //       message="Please select a valid payment method."
-    //     />
-    //   );
-    // }
 
     if (selectedNetwork.id === "solana") {
       return (
@@ -219,14 +176,11 @@ export default function PaymentUI({ paymentRequirements, onPaymentSuccess }) {
   };
 
   return (
-    <div
-      className={""}
-    >
+    <div className={""}>
       {availableNetworks.length === 0 ? (
         <NoPaymentOptions />
       ) : (
         <>
-          {/* Network Selection */}
           {availableNetworks.length > 1 && (
             <Dropdown
               type="network"
@@ -238,7 +192,6 @@ export default function PaymentUI({ paymentRequirements, onPaymentSuccess }) {
             />
           )}
 
-          {/* Coin Selection */}
           {selectedNetwork.coins.length > 0 && (
             <Dropdown
               type="coin"
@@ -250,9 +203,6 @@ export default function PaymentUI({ paymentRequirements, onPaymentSuccess }) {
             />
           )}
 
-          {/* Wallet Selection */}
-
-          {/* Payment Button */}
           {renderPaymentButton()}
         </>
       )}

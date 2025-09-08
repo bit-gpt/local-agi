@@ -6,17 +6,19 @@ import { useSolanaWallets } from "../hooks/useSolanaWallets";
  */
 export default function SolanaWalletSelector({
   onWalletSelect,
-  selectedWallet: propSelectedWallet, // Rename to avoid confusion
+  selectedWallet: propSelectedWallet, 
   disabled = false,
 }) {
-  const { wallets: solanaWallets, selectedWallet, selectedWalletAccount } = useSolanaWallets();
-  
-  // Use the wallet from props if provided, otherwise use the one from context
+  const {
+    wallets: solanaWallets,
+    selectedWallet,
+    selectedWalletAccount,
+  } = useSolanaWallets();
+
   const currentSelectedWallet = propSelectedWallet || selectedWallet;
 
   const handleWalletSelect = (wallet) => {
     if (!disabled) {
-      console.log("SolanaWalletSelector - Selecting wallet:", wallet?.name, wallet);
       onWalletSelect(wallet);
     }
   };
@@ -25,7 +27,8 @@ export default function SolanaWalletSelector({
     return (
       <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
         <p className="text-red-700 text-sm">
-          No Solana wallets detected. Please install a Solana wallet like Phantom.
+          No Solana wallets detected. Please install a Solana wallet like
+          Phantom.
         </p>
       </div>
     );
@@ -46,8 +49,11 @@ export default function SolanaWalletSelector({
             className={`
               relative flex items-center p-3 border rounded-lg cursor-pointer transition-all duration-200
               ${
-                (currentSelectedWallet?.name === wallet.name || 
-                 (selectedWalletAccount && wallet.accounts.some(acc => acc.address === selectedWalletAccount.address)))
+                currentSelectedWallet?.name === wallet.name ||
+                (selectedWalletAccount &&
+                  wallet.accounts.some(
+                    (acc) => acc.address === selectedWalletAccount.address
+                  ))
                   ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200"
                   : "border-gray-200 hover:bg-gray-50"
               }
@@ -60,8 +66,13 @@ export default function SolanaWalletSelector({
               id={wallet.name}
               name="solana-wallet-selection"
               value={wallet.name}
-              checked={currentSelectedWallet?.name === wallet.name || 
-                       (selectedWalletAccount && wallet.accounts.some(acc => acc.address === selectedWalletAccount.address))}
+              checked={
+                currentSelectedWallet?.name === wallet.name ||
+                (selectedWalletAccount &&
+                  wallet.accounts.some(
+                    (acc) => acc.address === selectedWalletAccount.address
+                  ))
+              }
               onChange={() => handleWalletSelect(wallet)}
               disabled={disabled}
               className="sr-only"
@@ -87,10 +98,13 @@ export default function SolanaWalletSelector({
               {wallet.name}
             </div>
 
-            {(currentSelectedWallet?.name === wallet.name || 
-              (selectedWalletAccount && wallet.accounts.some(acc => acc.address === selectedWalletAccount.address))) && (
-              <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
+            {(currentSelectedWallet?.name === wallet.name ||
+              (selectedWalletAccount &&
+                wallet.accounts.some(
+                  (acc) => acc.address === selectedWalletAccount.address
+                ))) && (
+              <div className="absolute -top-2 -right-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
               </div>
             )}
           </div>

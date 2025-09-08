@@ -6,7 +6,6 @@ export default function PaymentButton({
   className = "",
   children,
 }) {
-  // Determine if the button is in a processing state
   const isProcessing = [
     "connecting",
     "approving",
@@ -14,7 +13,6 @@ export default function PaymentButton({
     "success",
   ].includes(paymentStatus);
 
-  // Button text
   const buttonText = () => {
     switch (paymentStatus) {
       case "connecting":
@@ -32,8 +30,6 @@ export default function PaymentButton({
         return `Pay - ${amount}`;
     }
   };
-
-  console.log("amountssssssssssss", amount);
 
   return (
     <div className="flex flex-col w-full">

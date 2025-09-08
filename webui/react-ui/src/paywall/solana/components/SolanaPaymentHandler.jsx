@@ -1,10 +1,18 @@
-import {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {useWalletAccountTransactionSendingSigner, useWalletAccountTransactionSigner} from "@solana/react";
-import {useConnect} from "@wallet-standard/react";
-import {createPaymentHeader, h402Version} from "@bit-gpt/h402";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useWalletAccountTransactionSendingSigner,
+  useWalletAccountTransactionSigner,
+} from "@solana/react";
+import { useConnect } from "@wallet-standard/react";
+import { createPaymentHeader, h402Version } from "@bit-gpt/h402";
 import PaymentButtonUI from "../../components/PaymentButton";
 import SolanaWalletSelector from "./SolanaWalletSelector";
 import { useSolanaWallets } from "../hooks/useSolanaWallets";
+import {
+  formatError,
+  getPaymentStatusFromError,
+} from "../../utils/errorFormatter";
+import { useOutletContext } from "react-router-dom";
 
 /**
  * Solana-specific payment handler
@@ -20,81 +28,31 @@ export default function SolanaPaymentHandler({
   className = "",
 }) {
   const [errorMessage, setErrorMessage] = useState(null);
-  
-  // Use the custom hook for Solana wallet management
-  const { selectedWallet, selectedWalletAccount, setSelectedWalletAccount } = useSolanaWallets();
+  const [selectedWallet, setSelectedWallet] = useState(null);
 
-  // Simplified ref to track payment attempts
-  const paymentAttemptRef = useRef({attemptInProgress: false});
+  const { selectedWalletAccount, setSelectedWalletAccount } =
+    useSolanaWallets();
 
-  console.log("[DEBUG] selectedWalletSSSSSSSS", selectedWallet);
+  const paymentAttemptRef = useRef({ attemptInProgress: false });
 
-  // Handle wallet selection
   const handleWalletSelect = (wallet) => {
-    // Set the first account from the selected wallet
-    const firstAccount = wallet?.accounts?.[0];
-    setSelectedWalletAccount(firstAccount);
+    setSelectedWallet(wallet);
+    if (selectedWalletAccount) {
+      setSelectedWalletAccount(null);
+    }
   };
 
-  // Handle button click for unified experience
-  // If no account, connect first
-  // If already connected, start processing payment
   const handleButtonClick = async () => {
-    console.log("[DEBUG] Button clicked", {
-      selectedAccountAddress: selectedWalletAccount?.address,
-      currentStatus: paymentStatus,
-    });
-    // If not connected, prompt user to select a wallet
-    if (!selectedWalletAccount) {
-      if (!selectedWallet) {
-        setErrorMessage("Please select a wallet to connect");
-        return;
-      }
-      // If wallet is selected but not connected, try to connect
-      await handleConnectWallet();
+    if (selectedWallet && !selectedWalletAccount) {
+      setPaymentStatus("connecting");
       return;
     }
-    // If already connected, start processing payment
+
     setPaymentStatus("approving");
   };
 
-  // Connect wallet handler
-  const handleConnectWallet = async () => {
-    setErrorMessage(null);
-    setPaymentStatus("connecting");
-
-    try {
-      console.log("[DEBUG] Connecting wallet");
-      // Use existing accounts if available, otherwise connect to get accounts
-      const accounts =
-        selectedWallet?.accounts?.length > 0 ? selectedWallet.accounts : await connectFunction();
-      console.log("[DEBUG] Retrieved accounts", accounts?.length);
-      if (!accounts || accounts.length === 0) {
-        throw new Error("No accounts available");
-      }
-      setSelectedWalletAccount(accounts[0]);
-      // Set the status to approving to show tx approval in wallet
-      setPaymentStatus("approving");
-    } catch (err) {
-      console.error("[DEBUG] Wallet connection error:", err);
-      setPaymentStatus("error");
-      const errMsg = err instanceof Error ? err.message : String(err);
-      setErrorMessage(errMsg);
-      onError?.(err instanceof Error ? err : new Error(errMsg));
-    }
-  };
-
-  // Update payment status callbacks
   const handlePaymentSuccess = useCallback(
     (paymentHeader) => {
-      console.log("[DEBUG] Payment signed and maybe sent");
-      console.log("[DEBUG] Payment header:", paymentHeader);
-
-      // Keep the processing state - we'll let the parent component set success
-      // after facilitator verifies the transaction
-
-      // Call onSuccess immediately - the parent will handle facilitator verification
-      // Pass setStatus so the parent can update our status after facilitator verification
       if (onSuccess) onSuccess(paymentHeader);
     },
     [onSuccess]
@@ -103,34 +61,12 @@ export default function SolanaPaymentHandler({
   const handlePaymentError = useCallback(
     (err) => {
       const errMsg = err instanceof Error ? err.message : String(err);
-      console.log("[DEBUG] Payment error", {errMsg});
 
-      // Check if this is a user cancellation
-      const isUserCancellation =
-        errMsg.includes("cancelled by user") ||
-        errMsg.includes("User rejected");
+      const errorInfo = formatError(err, { networkName: "Solana" });
 
-      // Check if this is a facilitator error using the custom property
-      const isFacilitatorError = err.isFacilitatorError === true;
+      setPaymentStatus(getPaymentStatusFromError(errorInfo.type));
+      setErrorMessage(errorInfo.message);
 
-      if (isUserCancellation) {
-        console.log("[DEBUG] User cancelled payment");
-        // Set status to error so the error message is displayed
-        setPaymentStatus("error");
-        setErrorMessage("Transaction cancelled by user");
-      } else if (isFacilitatorError) {
-        console.log("[DEBUG] Facilitator service unavailable");
-        // Use the specific facilitator_error status
-        setPaymentStatus("facilitator_error");
-        setErrorMessage(
-          "Payment verification service is currently unavailable. Please try again later."
-        );
-      } else {
-        setPaymentStatus("error");
-        setErrorMessage(errMsg);
-      }
-
-      // Always reset payment tracking
       paymentAttemptRef.current.attemptInProgress = false;
 
       if (onError) onError(err instanceof Error ? err : new Error(errMsg));
@@ -139,40 +75,40 @@ export default function SolanaPaymentHandler({
   );
 
   const handlePaymentProcessing = useCallback(() => {
-    console.log("[DEBUG] Payment processing started");
     setPaymentStatus("processing");
     paymentAttemptRef.current.attemptInProgress = true;
   }, []);
 
-  // Determine if the button is disabled
+  const handleConnectionError = (err) => {
+    console.error(
+      "[DEBUG] Connection error from WalletConnectionManager:",
+      err
+    );
+    const errorInfo = formatError(err, { networkName: "Solana" });
+    setPaymentStatus(getPaymentStatusFromError(errorInfo.type));
+    setErrorMessage(errorInfo.message);
+  };
+
   const isDisabled =
     ["processing", "success"].includes(paymentStatus) ||
-    (!selectedWalletAccount && !selectedWallet); // Disable if no wallet selected and not connected
+    (!selectedWalletAccount && !selectedWallet);
 
   return (
     <div className="flex flex-col w-full space-y-4">
-      {/* Wallet Selector - Always visible */}
       <SolanaWalletSelector
         onWalletSelect={handleWalletSelect}
         selectedWallet={selectedWallet}
         disabled={paymentStatus === "connecting"}
       />
-
-      {/* Error Message */}
-      {/* {errorMessage && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-700 text-sm">{errorMessage}</p>
-        </div>
-      )} */}
-
-      {/* Wallet Connection Manager - conditionally rendered */}
-      {selectedWallet && (
+      {selectedWallet && paymentStatus === "connecting" && (
         <WalletConnectionManager
           wallet={selectedWallet}
+          onConnectionError={handleConnectionError}
+          paymentStatus={paymentStatus}
+          setSelectedWalletAccount={setSelectedWalletAccount}
+          setPaymentStatus={setPaymentStatus}
         />
       )}
-
-      {/* Payment processor component that watches for account and status */}
       {selectedWalletAccount &&
         paymentStatus === "approving" &&
         !paymentAttemptRef.current.attemptInProgress && (
@@ -198,7 +134,6 @@ export default function SolanaPaymentHandler({
   );
 }
 
-// Payment processor component that can use the hook with a valid account
 function SolanaPaymentProcessor({
   account,
   paymentRequirements,
@@ -211,25 +146,21 @@ function SolanaPaymentProcessor({
     account,
     "solana:mainnet"
   );
-  const transactionSigner = useWalletAccountTransactionSigner(account, "solana:mainnet")
+  const transactionSigner = useWalletAccountTransactionSigner(
+    account,
+    "solana:mainnet"
+  );
 
-  // Debug - Track if this component has already attempted a payment
   const hasAttemptedRef = useRef(false);
 
-  // Process payment on mount
   useEffect(() => {
-    // Guard against multiple attempts
     if (
       hasAttemptedRef.current ||
       (paymentAttemptRef.current && paymentAttemptRef.current.attemptInProgress)
     ) {
-      console.log(
-        "[DEBUG-PAYMENT-FLOW] Payment already in progress or attempted, skipping"
-      );
       return;
     }
 
-    // Mark as attempted at the component level
     hasAttemptedRef.current = true;
 
     const processPayment = async () => {
@@ -244,8 +175,7 @@ function SolanaPaymentProcessor({
         const signAndSendTransactionFn =
           transactionSendingSigner?.signAndSendTransactions;
 
-        const signTransactionFn =
-          transactionSigner?.modifyAndSignTransactions;
+        const signTransactionFn = transactionSigner?.modifyAndSignTransactions;
 
         const paymentClients = {
           solanaClient: {
@@ -255,69 +185,108 @@ function SolanaPaymentProcessor({
           },
         };
 
-        // Create payment using the h402 payment library
-        // At this point the user will be prompted to approve the transaction
-        console.log("[DEBUG Solana Payment Handler] Calling createPayment now...");
-        console.log("[DEBUG Solana Payment Handler] Payment requirements:", paymentRequirements.newtworkId);
         const paymentHeader = await createPaymentHeader(
           paymentClients,
           h402Version,
-          paymentRequirements,
+          paymentRequirements
         );
-        console.log("[DEBUG Solana Payment Handler] createPayment completed successfully");
-        // If we get here, it means the user has approved the transaction
-        // Now we can set the processing state as we wait for confirmation
         onProcessing();
         onSuccess(paymentHeader);
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        // Check for facilitator unavailability
-        const isFacilitatorUnavailable =
-          errorMessage.includes("Facilitator service unavailable") ||
-          errorMessage.includes(
-            "Payment verification service is currently unavailable"
-          ) ||
-          errorMessage.includes("fetch failed");
+        const errorInfo = formatError(err, { networkName: "Solana" });
 
-        const isUserRejection = errorMessage.includes(
-          "User rejected the request"
-        );
-
-        if (isUserRejection) {
-          onError(new Error("Transaction cancelled by user"));
-        } else if (isFacilitatorUnavailable) {
-          // Create a custom error with a special type property for the parent component to identify
-          const facilitatorError = new Error(
-            "Payment verification service is currently unavailable. Please try again later."
-          );
-          // Add a custom property to identify this as a facilitator error
+        if (errorInfo.isFacilitatorError) {
+          const facilitatorError = new Error(errorInfo.message);
           Object.defineProperty(facilitatorError, "isFacilitatorError", {
             value: true,
             enumerable: true,
           });
           onError(facilitatorError);
         } else {
-          onError(err instanceof Error ? err : new Error(String(err)));
+          onError(err instanceof Error ? err : new Error(errorInfo.message));
         }
       }
     };
 
     processPayment();
 
-    // Clean up function
     return () => {
       paymentAttemptRef.current.attemptInProgress = false;
     };
-  }, [account, paymentRequirements, transactionSendingSigner, onSuccess, onError, onProcessing, paymentAttemptRef, transactionSigner?.modifyAndSignTransactions]);
+  }, [
+    account,
+    paymentRequirements,
+    transactionSendingSigner,
+    onSuccess,
+    onError,
+    onProcessing,
+    paymentAttemptRef,
+    transactionSigner?.modifyAndSignTransactions,
+  ]);
 
-  // This component doesn't render anything
   return null;
 }
 
-// Separate component to handle wallet connection hook
-function WalletConnectionManager({ wallet }) {
+function WalletConnectionManager({
+  wallet,
+  onConnectionError,
+  setSelectedWalletAccount,
+  setPaymentStatus,
+}) {
+  const { showToast } = useOutletContext();
   const [isConnecting, connect] = useConnect(wallet);
-  
-  // This component doesn't render anything
+  const connectionAttemptedRef = useRef(false);
+  const walletAccountSelectionRef = useRef(false);
+  const { wallets } = useSolanaWallets();
+  const [connectionSuccess, setConnectionSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!isConnecting && !connectionAttemptedRef.current) {
+      connectionAttemptedRef.current = true;
+
+      const handleConnection = async () => {
+        try {
+          await connect();
+          setConnectionSuccess(true);
+        } catch (err) {
+          const errorInfo = formatError(err);
+          showToast(errorInfo.message, "error");
+          setConnectionSuccess(false);
+          if (onConnectionError) {
+            onConnectionError(err);
+          }
+        }
+      };
+
+      handleConnection();
+    }
+  }, [isConnecting, connect, onConnectionError, setConnectionSuccess]);
+
+  useEffect(() => {
+    if (
+      wallets.length > 0 &&
+      connectionAttemptedRef.current &&
+      connectionSuccess &&
+      !walletAccountSelectionRef.current
+    ) {
+      walletAccountSelectionRef.current = true;
+      const updatedWallet = wallets.find((w) => w.name === wallet.name);
+
+      if (updatedWallet?.accounts?.length > 0) {
+        setSelectedWalletAccount(updatedWallet.accounts[0]);
+        setPaymentStatus("approving");
+      } else {
+        throw new Error("No accounts available after connection");
+      }
+    }
+  }, [
+    wallet,
+    wallets,
+    setSelectedWalletAccount,
+    setPaymentStatus,
+    walletAccountSelectionRef,
+    connectionSuccess,
+  ]);
+
   return null;
 }

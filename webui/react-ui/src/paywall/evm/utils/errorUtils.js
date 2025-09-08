@@ -3,48 +3,6 @@
  */
 
 /**
- * Maps error messages to user-friendly messages
- * @param {Error} error - The error object
- * @param {string} networkName - The network name for context
- * @returns {string} User-friendly error message
- */
-export function getWalletErrorMessage(error, networkName = "the network") {
-  if (!(error instanceof Error)) {
-    return "Failed to connect wallet";
-  }
-
-  const message = error.message;
-
-  if (message.includes("Unsupported chain")) {
-    return `This wallet doesn't support ${networkName}. Please use MetaMask or another compatible wallet.`;
-  }
-  
-  if (message.includes("User rejected") || message.includes("rejected")) {
-    return "Connection rejected. Please try again.";
-  }
-  
-  if (message.includes("already pending")) {
-    return "Connection already pending. Check your wallet.";
-  }
-  
-  if (message.includes("No Ethereum provider") || message.includes("No Ethereum wallet detected")) {
-    return "No Ethereum provider found. Please install a wallet extension.";
-  }
-  
-  if (
-    message.includes("chain of the connector") ||
-    message.includes("chain mismatch") ||
-    message.includes("approve the network switch") ||
-    message.includes("manually switch") ||
-    message.includes("Please switch to")
-  ) {
-    return message;
-  }
-
-  return message || "Failed to connect wallet";
-}
-
-/**
  * Validates that the required wallet environment is available
  * @throws {Error} If wallet environment is not available
  */

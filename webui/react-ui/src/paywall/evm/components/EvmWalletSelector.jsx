@@ -43,11 +43,11 @@ export default function EvmWalletSelector({
         });
       }
 
-      if (window.ethereum?.isTrust) {
+      if (window.trustwallet?.isTrust) {
         wallets.push({
           id: "trust",
           name: "Trust Wallet",
-          icon: "/app/wallets/trust.svg",
+          icon: "/app/wallets/trustwallet.svg",
           type: "evm",
         });
       }
@@ -153,8 +153,8 @@ export default function EvmWalletSelector({
             </div>
 
             {selectedWallet === wallet.id && (
-              <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
+              <div className="absolute -top-2 -right-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
               </div>
             )}
           </div>
