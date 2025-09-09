@@ -18,6 +18,7 @@ import (
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/programs/token"
 	"github.com/gagliardetto/solana-go/rpc"
+	"github.com/mudler/LocalAGI/core/h402"
 	coretypes "github.com/mudler/LocalAGI/core/types"
 )
 
@@ -403,7 +404,7 @@ func (w *SolanaServerWallet) WaitForTransactionWithTimeout(ctx context.Context, 
 	}
 }
 
-func (w *SolanaServerWallet) CreatePaymentTransaction(ctx context.Context, paymentReq H402PaymentRequirement) (string, string, error) {
+func (w *SolanaServerWallet) CreatePaymentTransaction(ctx context.Context, paymentReq h402.H402PaymentRequirement) (string, string, error) {
 	toPubkey, err := solana.PublicKeyFromBase58(paymentReq.PayToAddress)
 	if err != nil {
 		return "", "", fmt.Errorf("invalid recipient address: %v", err)
@@ -532,8 +533,8 @@ func (w *SolanaServerWallet) CreatePaymentTransaction(ctx context.Context, payme
 	return txBase64, signatureStr, nil
 }
 
-func (w *SolanaServerWallet) GetH402Client() *H402Client {
-	return NewH402Client(w, w)
+func (w *SolanaServerWallet) GetH402Client() *h402.H402Client {
+	return h402.NewH402Client(w, w)
 }
 
 func (w *SolanaServerWallet) SendH402Request(ctx context.Context, method, url string, requestBody []byte) (*http.Response, error) {

@@ -5,17 +5,20 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 
-	"github.com/mudler/LocalAGI/core/serverwallet"
+	"github.com/mudler/LocalAGI/core/h402"
 	"github.com/mudler/LocalAGI/core/state"
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	"jaytaylor.com/html2text"
 )
 
-func NewBrowse(config map[string]string) *BrowseAction {
-	return &BrowseAction{}
+func NewBrowse(config map[string]string, pool *state.AgentPool) *BrowseAction {
+	return &BrowseAction{
+		pool: pool,
+	}
 }
 
 func NewBrowseWithWallets(config map[string]string, wallets map[types.ServerWalletType]types.ServerWallet, payLimits map[string]float64, pool *state.AgentPool) *BrowseAction {
@@ -42,7 +45,7 @@ func (a *BrowseAction) Run(ctx context.Context, sharedState *types.AgentSharedSt
 		return types.ActionResult{}, err
 	}
 
-	clientWrapper := serverwallet.NewHTTPClientWrapper(serverwallet.HTTPClientOptions{
+	clientWrapper := h402.NewHTTPClientWrapper(h402.HTTPClientOptions{
 		Timeout:       30 * time.Second,
 		ForceHTTP1:    true,
 		ServerWallets: a.serverWallets,
@@ -73,7 +76,7 @@ func (a *BrowseAction) Run(ctx context.Context, sharedState *types.AgentSharedSt
 	}
 
 	if respWithPaymentInfo != nil && respWithPaymentInfo.PayLimitExceeded != nil {
-		payLimitMessage := serverwallet.FormatPayLimitErrorMessage(respWithPaymentInfo.PayLimitExceeded)
+		payLimitMessage := h402.FormatPayLimitErrorMessage(respWithPaymentInfo.PayLimitExceeded)
 		fmt.Println("Pay limit exceeded:", payLimitMessage)
 		return types.ActionResult{Result: payLimitMessage}, nil
 	}
@@ -123,7 +126,12 @@ func (a *BrowseAction) Run(ctx context.Context, sharedState *types.AgentSharedSt
 	resultMessage := fmt.Sprintf("Successfully browsed '%s':\n\n", result.URL)
 
 	if respWithPaymentInfo != nil && respWithPaymentInfo.PaymentInfo != nil {
-		paymentMessage := serverwallet.FormatPaymentMessage(respWithPaymentInfo.PaymentInfo)
+		var paymentMessage string
+		if os.Getenv("LOCALAGI_ENABLE_SERVER_WALLETS") == "true" {
+			paymentMessage = h402.FormatPaymentMessage(respWithPaymentInfo.PaymentInfo)
+		} else {
+			paymentMessage = h402.FormatPaymentMessageWalletConnection(respWithPaymentInfo.PaymentInfo)
+		}
 		resultMessage += paymentMessage + "\n\n"
 	}
 

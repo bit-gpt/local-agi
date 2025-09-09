@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 /* Base styles */
 pre.hljs {
   background-color: var(--medium-bg);
@@ -44,8 +46,6 @@ code.json {
 
 * {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
 div#root {
@@ -125,6 +125,7 @@ a:hover {
   justify-content: space-between;
   padding: 0 1rem;
   height: 96px;
+  max-width: 100%;
 }
 
 .nav-content {
@@ -2748,7 +2749,7 @@ a:hover {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 100;
 }
 
 .modal-content {
@@ -2758,7 +2759,6 @@ a:hover {
   max-width: 600px;
   width: 90%;
   max-height: 80vh;
-  overflow-y: auto;
 }
 
 .modal-header {
@@ -2796,7 +2796,7 @@ a:hover {
 }
 
 .modal-body {
-  padding: 0 1.5rem;
+  padding: 0 1.5rem 1.5rem 1.5rem;
 }
 
 .modal-description {
@@ -3032,4 +3032,41 @@ a:hover {
 
 .mobile-placeholder-overlay .logo-image {
   height: 48px;
+}
+
+.payment-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: 500;
+  cursor: pointer;
+  gap: 8px;
+  border: none;
+  transition: opacity 0.2s, background-color 0.2s;
+  background: var(--primary);
+  color: white;
+}
+
+.payment-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.payment-button:hover,
+.payment-button:focus {
+  opacity: 0.9;
+}
+
+.payment-button-processing {
+  opacity: 0.9;
+  cursor: wait;
+}
+
+.payment-button-spinner {
+  animation: spin 1s linear infinite;
+  margin-right: 0.75rem;
+  height: 1.25rem;
+  width: 1.25rem;
 }

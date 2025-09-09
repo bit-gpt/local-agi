@@ -6,6 +6,11 @@ import { agentApi } from "../utils/api";
 import TypingIndicator from "../components/TypingIndicator";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import PaymentModal from "../paywall/components/PaymentModal";
+import { SelectedWalletAccountContextProvider } from "../paywall/solana/context/SelectedWalletAccountContextProvider";
+import { EvmWalletProvider } from "../paywall/evm/context/EvmWalletContext";
+import { WagmiProvider } from "wagmi";
+import { config } from "../paywall/evm/config/wagmi";
 
 const PAY_LIMIT_STATUS = {
   APPROVED: "APPROVED",
@@ -20,27 +25,28 @@ function Chat() {
   const messagesEndRef = useRef(null);
   const [approveLoading, setApproveLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
-  // Observable status tracking
+
   const [currentStatus, setCurrentStatus] = useState(null);
   const [eventSource, setEventSource] = useState(null);
   const [requirePaymentApproval, setRequirePaymentApproval] = useState(null);
-  // Helper function to map observable data to user-friendly status messages
+  const [paymentRequestsData, setPaymentRequestsData] = useState(null);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [hasScrolledToInitialMessages, setHasScrolledToInitialMessages] =
+    useState(false);
+
   const getStatusMessage = (observable) => {
     if (!observable) return null;
 
-    // Check for errors first
     if (observable.completion?.error) {
       return "Error while processing. Please try again.";
     }
 
     const name = observable.name?.toLowerCase() || "";
 
-    // Map different observable types to user-friendly messages
     switch (name) {
       case "job":
         return "Thinking";
       case "decision":
-        // Check for tool calls in completion to provide more specific status
         const completion = observable.completion;
         if (
           completion?.chat_completion_response?.choices?.[0]?.message
@@ -52,7 +58,6 @@ function Chat() {
             let toolName =
               toolCalls[0].function?.name || toolCalls[0].name || "";
 
-            // Try to extract actual tool from arguments if function name is generic (like "pick_tool")
             if (toolName === "pick_tool" || toolName === "call_tool") {
               try {
                 const args = JSON.parse(
@@ -62,7 +67,6 @@ function Chat() {
                   toolName = args.tool;
                 }
               } catch (e) {
-                // If parsing fails, keep the original toolName
                 console.log("Failed to parse tool arguments:", e);
               }
             }
@@ -97,14 +101,13 @@ function Chat() {
             if (toolName.toLowerCase().includes("reply")) {
               return "Preparing response";
             }
-            // Generic tool call message
             return null;
           }
         }
         setRequirePaymentApproval(null);
+        setPaymentRequestsData(null);
         return "Thinking";
       case "action":
-        // Try to get more specific message based on action type
         const actionName = observable.creation?.function_definition?.name;
         if (actionName) {
           if (actionName.includes("search")) return "Searching the web";
@@ -113,12 +116,17 @@ function Chat() {
           if (actionName.includes("email") || actionName.includes("mail"))
             return "Sending email";
           if (actionName.includes("shell")) return "Running command";
-          if (actionName.includes("estimate_transaction_fee")) return "Estimating transaction fee";
-          if (actionName.includes("get_server_wallet_address")) return "Getting server wallet address";
-          if (actionName.includes("get_all_server_wallet_balances")) return "Getting server wallet balances";
-          if (actionName.includes("get_server_wallet_balance")) return "Getting server wallet balance";
+          if (actionName.includes("estimate_transaction_fee"))
+            return "Estimating transaction fee";
+          if (actionName.includes("get_server_wallet_address"))
+            return "Getting server wallet address";
+          if (actionName.includes("get_all_server_wallet_balances"))
+            return "Getting server wallet balances";
+          if (actionName.includes("get_server_wallet_balance"))
+            return "Getting server wallet balance";
           if (actionName.includes("send_crypto")) return "Sending crypto";
-          if (actionName.includes("wait_for_transaction_confirmation")) return "Waiting for transaction confirmation";
+          if (actionName.includes("wait_for_transaction_confirmation"))
+            return "Waiting for transaction confirmation";
           return `Running ${actionName}`;
         }
         return "Taking action";
@@ -129,18 +137,11 @@ function Chat() {
     }
   };
 
-  // Helper function to check if an observable has an error
-  const hasError = (observable) => {
-    return observable?.completion?.error;
-  };
-
-  // Fetch agent config on mount
   useEffect(() => {
     const fetchAgentConfig = async () => {
       try {
         const config = await agentApi.getAgentConfig(id);
         setAgentConfig(config);
-        // setIsOpenRouter(config.model.split("/")[0] === "openrouter");
       } catch (error) {
         console.error("Failed to load agent config", error);
         showToast && showToast(error?.message || String(error), "error");
@@ -150,7 +151,6 @@ function Chat() {
     fetchAgentConfig();
   }, []);
 
-  // Setup SSE connection for observable updates
   useEffect(() => {
     if (!id) return;
 
@@ -161,7 +161,6 @@ function Chat() {
       const data = JSON.parse(event.data);
 
       if (data.completion) {
-        // Observable is completed
         if (data.completion.error) {
           setCurrentStatus({
             message: "Error while processing. Please try again.",
@@ -176,7 +175,6 @@ function Chat() {
           }
         }
       } else {
-        // Observable is active, show its status
         const statusMessage = getStatusMessage(data);
         if (statusMessage) {
           setCurrentStatus({ message: statusMessage, isError: false });
@@ -187,6 +185,11 @@ function Chat() {
     sse.addEventListener("request_payment_approval", (event) => {
       console.log("request_payment_approval", event.data);
       setRequirePaymentApproval(event.data);
+    });
+
+    sse.addEventListener("request_payment_header", (event) => {
+      console.log("request_payment_header", event.data);
+      setPaymentRequestsData(JSON.parse(event.data));
     });
 
     sse.onerror = (err) => {
@@ -200,12 +203,10 @@ function Chat() {
     };
   }, [id]);
 
-  // Callback to clear status when chat processing is completed
   const handleStatusCompleted = useCallback(() => {
     setCurrentStatus(null);
   }, []);
 
-  // Use our custom chat hook with model from agent config
   const {
     messages,
     sending,
@@ -216,7 +217,6 @@ function Chat() {
     clearError,
   } = useChat(id, agentConfig?.model, handleStatusCompleted);
 
-  // Clear status when we receive a new assistant message
   useEffect(() => {
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
@@ -236,38 +236,41 @@ function Chat() {
   }, [agentConfig]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, currentStatus, requirePaymentApproval]);
-
-  // useEffect(() => {
-  //   if (error) {
-  //     showToast && showToast(error?.message || String(error), "error");
-  //     clearError();
-  //   }
-  // }, [error, showToast, clearError]);
+    if (!hasScrolledToInitialMessages && messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+      setHasScrolledToInitialMessages(true);
+    } else if (hasScrolledToInitialMessages) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [
+    messages,
+    currentStatus,
+    requirePaymentApproval,
+    paymentRequestsData,
+    hasScrolledToInitialMessages,
+  ]);
 
   const handleSend = (e) => {
     e.preventDefault();
     if (message.trim() !== "") {
       sendMessage(message);
       setMessage("");
-      // Clear any existing status when sending a new message
       setCurrentStatus(null);
     }
   };
 
   const handleApprovePayment = async () => {
-   setApproveLoading(true);
-   try {
-    await agentApi.updateAgentPayLimitStatus(id, PAY_LIMIT_STATUS.APPROVED);
-    showToast("Payment approved successfully", "success");
-    setRequirePaymentApproval(null);
-   } catch (error) {
-    console.error("Failed to approve payment", error);
-    showToast && showToast(error?.message || String(error), "error");
-   } finally {
-    setApproveLoading(false);
-   }
+    setApproveLoading(true);
+    try {
+      await agentApi.updateAgentPayLimitStatus(id, PAY_LIMIT_STATUS.APPROVED);
+      showToast("Payment approved successfully", "success");
+      setRequirePaymentApproval(null);
+    } catch (error) {
+      console.error("Failed to approve payment", error);
+      showToast && showToast(error?.message || String(error), "error");
+    } finally {
+      setApproveLoading(false);
+    }
   };
 
   const handleCancelPayment = async () => {
@@ -284,6 +287,44 @@ function Chat() {
     }
   };
 
+  const handleCancelPaymentRequest = async () => {
+    setCancelLoading(true);
+    try {
+      await agentApi.submitPaymentHeader(id, paymentRequestsData.requestId, {
+        status: "CANCELLED",
+      });
+      showToast("Payment request cancelled successfully", "success");
+      setPaymentRequestsData(null);
+    } catch (error) {
+      console.error("Failed to cancel payment", error);
+      showToast && showToast(error?.message || String(error), "error");
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
+  const openPaymentModal = () => {
+    setPaymentModalOpen(true);
+  };
+
+  const handlePaymentSuccess = async (paymentHeader, selectedRequestID) => {
+    try {
+      await agentApi.submitPaymentHeader(id, paymentRequestsData.requestId, {
+        status: "APPROVED",
+        paymentHeader: paymentHeader,
+        selectedRequestID: selectedRequestID,
+      });
+      showToast("Payment request approved successfully", "success");
+      setPaymentModalOpen(false);
+      setPaymentRequestsData(null);
+    } catch (error) {
+      console.error("Failed to approve payment", error);
+      showToast && showToast(error?.message || String(error), "error");
+    } finally {
+      setApproveLoading(false);
+    }
+  };
+
   if (!agentConfig) {
     return (
       <div className="dashboard-container">
@@ -297,81 +338,135 @@ function Chat() {
   }
 
   return (
-    <div className="dashboard-container">
-      <div className="main-content-area">
-        <div className="header-container">
-          <Header
-            title="Chat with"
-            description="Send messages and interact with your agent in real time."
-            name={agentConfig.name}
-          />
-          {/* No right content for chat header */}
-        </div>
+    <WagmiProvider config={config}>
+      <EvmWalletProvider>
+        <SelectedWalletAccountContextProvider>
+          <div className="dashboard-container">
+            <div className="main-content-area">
+              <div className="header-container">
+                <Header
+                  title="Chat with"
+                  description="Send messages and interact with your agent in real time."
+                  name={agentConfig.name}
+                />
+              </div>
 
-        {/* Chat Window */}
-        <div
-          className="section-box chat-section-box"
-          style={{
-            width: "100%",
-            height: "calc(100vh - 300px)",
-            display: "flex",
-            flexDirection: "column",
-            margin: 0,
-            maxWidth: "none",
-          }}
-        >
-          <div
-            style={{
-              flex: 1,
-              overflowY: "auto",
-            }}
-          >
-            {messages.length === 0 ? (
               <div
+                className="section-box chat-section-box"
                 style={{
-                  color: "var(--text-light)",
-                  textAlign: "center",
-                  marginTop: 48,
+                  width: "100%",
+                  height: "calc(100vh - 300px)",
+                  display: "flex",
+                  flexDirection: "column",
+                  margin: 0,
+                  maxWidth: "none",
                 }}
               >
-                No messages yet. Say hello!
-              </div>
-            ) : (
-              messages.map((msg, idx) =>
-                msg.loading ? null : (
-                  <div
-                    key={idx}
-                    style={{
-                      marginBottom: 12,
-                      display: "flex",
-                      flexDirection:
-                        msg.sender === "user" ? "row-reverse" : "row",
-                    }}
-                  >
-                    {msg.sender === "user" ? (
-                      <div
-                        style={{
-                          background: "#e0e7ff",
-                          color: "#222",
-                          borderRadius: 18,
-                          padding: "12px 18px",
-                          maxWidth: "70%",
-                          fontSize: "1rem",
-                          boxShadow: "0 2px 6px rgba(0,0,0,0.04)",
-                          alignSelf: "flex-end",
-                        }}
-                      >
-                        <div className="markdown-content">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {msg.content}
-                          </ReactMarkdown>
+                <div
+                  style={{
+                    flex: 1,
+                    overflowY: "auto",
+                  }}
+                >
+                  {messages.length === 0 ? (
+                    <div
+                      style={{
+                        color: "var(--text-light)",
+                        textAlign: "center",
+                        marginTop: 48,
+                      }}
+                    >
+                      No messages yet. Say hello!
+                    </div>
+                  ) : (
+                    messages.map((msg, idx) =>
+                      msg.loading ? null : (
+                        <div
+                          key={idx}
+                          style={{
+                            marginBottom: 12,
+                            display: "flex",
+                            flexDirection:
+                              msg.sender === "user" ? "row-reverse" : "row",
+                          }}
+                        >
+                          {msg.sender === "user" ? (
+                            <div
+                              style={{
+                                background: "#e0e7ff",
+                                color: "#222",
+                                borderRadius: 18,
+                                padding: "12px 18px",
+                                maxWidth: "70%",
+                                fontSize: "1rem",
+                                boxShadow: "0 2px 6px rgba(0,0,0,0.04)",
+                                alignSelf: "flex-end",
+                              }}
+                            >
+                              <div className="markdown-content">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                  {msg.content}
+                                </ReactMarkdown>
+                              </div>
+                            </div>
+                          ) : msg.type === "error" ? (
+                            <div
+                              style={{
+                                color: "#991b1b",
+                                padding: "12px 0",
+                                maxWidth: "70%",
+                                fontSize: "1rem",
+                                alignSelf: "flex-start",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                              }}
+                            >
+                              <span
+                                style={{ fontSize: "16px", fontWeight: 400 }}
+                              >
+                                <div className="markdown-content">
+                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    Error while processing. Please try again.
+                                  </ReactMarkdown>
+                                </div>
+                              </span>
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                background: "transparent",
+                                color: "#222",
+                                padding: "12px 0",
+                                maxWidth: "70%",
+                                fontSize: "1rem",
+                                alignSelf: "flex-start",
+                                position: "relative",
+                              }}
+                            >
+                              <div className="markdown-content">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                  {msg.content}
+                                </ReactMarkdown>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ) : // Check if this is an error message
-                    msg.type === "error" ? (
+                      )
+                    )
+                  )}
+
+                  {currentStatus && (
+                    <div
+                      style={{
+                        marginBottom: 12,
+                        display: "flex",
+                        flexDirection: "row",
+                      }}
+                    >
                       <div
                         style={{
-                          color: "#991b1b",
+                          color: currentStatus.isError ? "#991b1b" : "#6b7280",
                           padding: "12px 0",
                           maxWidth: "70%",
                           fontSize: "1rem",
@@ -381,161 +476,154 @@ function Chat() {
                           gap: "8px",
                         }}
                       >
-                        <span style={{ fontSize: "16px", fontWeight: 400 }}>
-                          <div className="markdown-content">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              Error while processing. Please try again.
-                            </ReactMarkdown>
-                          </div>
+                        {currentStatus.isError ? null : (
+                          <div
+                            style={{
+                              width: "16px",
+                              height: "16px",
+                              border: "2px solid #e5e7eb",
+                              borderTop: "2px solid #6b7280",
+                              borderRadius: "50%",
+                              animation: "spin 1s linear infinite",
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                        <span
+                          style={{
+                            fontSize: "16px",
+                            fontWeight: currentStatus.isError ? 400 : 500,
+                          }}
+                        >
+                          {requirePaymentApproval
+                            ? "Waiting for your confirmation"
+                            : paymentRequestsData
+                            ? "Waiting for your payment"
+                            : currentStatus.message}
                         </span>
                       </div>
-                    ) : (
-                      <div
-                        style={{
-                          background: "transparent",
-                          color: "#222",
-                          padding: "12px 0",
-                          maxWidth: "70%",
-                          fontSize: "1rem",
-                          alignSelf: "flex-start",
-                          position: "relative",
-                        }}
-                      >
-                        <div className="markdown-content">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {msg.content}
-                          </ReactMarkdown>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              )
-            )}
-
-            {/* Show current status as a temporary message */}
-            {currentStatus && (
-              <div
-                style={{
-                  marginBottom: 12,
-                  display: "flex",
-                  flexDirection: "row",
-                }}
-              >
-                <div
-                  style={{
-                    color: currentStatus.isError ? "#991b1b" : "#6b7280",
-                    padding: "12px 0",
-                    maxWidth: "70%",
-                    fontSize: "1rem",
-                    alignSelf: "flex-start",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}
-                >
-                  {currentStatus.isError ? null : (
-                    <div
-                      style={{
-                        width: "16px",
-                        height: "16px",
-                        border: "2px solid #e5e7eb",
-                        borderTop: "2px solid #6b7280",
-                        borderRadius: "50%",
-                        animation: "spin 1s linear infinite",
-                        flexShrink: 0,
-                      }}
-                    />
+                    </div>
                   )}
-                  <span
+
+                  {requirePaymentApproval && (
+                    <>
+                      <div className="payment-approval-message">
+                        {requirePaymentApproval}
+                      </div>
+                      <div className="payment-approval-container">
+                        <button
+                          className="btn-solid"
+                          onClick={handleApprovePayment}
+                          disabled={approveLoading || cancelLoading}
+                        >
+                          {approveLoading && <div className="btn-spinner" />}
+                          Approve
+                        </button>
+                        <button
+                          className="btn-outline"
+                          onClick={handleCancelPayment}
+                          disabled={cancelLoading || approveLoading}
+                        >
+                          {cancelLoading && (
+                            <div className="btn-spinner outline" />
+                          )}
+                          Cancel
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  {paymentRequestsData && (
+                    <>
+                      <div className="payment-approval-message">
+                        {requirePaymentApproval}
+                      </div>
+                      <div className="payment-approval-container">
+                        <button
+                          className="btn-solid"
+                          onClick={openPaymentModal}
+                          disabled={cancelLoading}
+                        >
+                          Pay now
+                        </button>
+                        <button
+                          className="btn-outline"
+                          onClick={handleCancelPaymentRequest}
+                          disabled={cancelLoading}
+                        >
+                          {cancelLoading && (
+                            <div className="btn-spinner outline" />
+                          )}
+                          Cancel
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  <div ref={messagesEndRef} />
+                </div>
+
+                <form
+                  onSubmit={handleSend}
+                  style={{ display: "flex", gap: 12, alignItems: "center" }}
+                  autoComplete="off"
+                >
+                  <input
+                    type="text"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder={
+                      isConnected ? "Type your message..." : "Connecting..."
+                    }
+                    disabled={sending || !isConnected}
                     style={{
-                      fontSize: "16px",
-                      fontWeight: currentStatus.isError ? 400 : 500,
+                      flex: 1,
+                      padding: "12px 16px",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 8,
+                      fontSize: "1rem",
+                      background: sending || !isConnected ? "#f3f4f6" : "#fff",
+                      color: "#222",
+                      outline: "none",
+                      transition: "border-color 0.15s",
                     }}
+                  />
+                  <button
+                    type="submit"
+                    className="action-btn"
+                    style={{ minWidth: 120 }}
+                    disabled={sending || !isConnected}
                   >
-                    {requirePaymentApproval ? 'Waiting for your confirmation' : currentStatus.message}
-                  </span>
-                </div>
+                    <i className="fas fa-paper-plane"></i> Send
+                  </button>
+                  <button
+                    type="button"
+                    className="action-btn"
+                    style={{
+                      background: "#f6f8fa",
+                      color: "#222",
+                      minWidth: 120,
+                    }}
+                    onClick={clearChat}
+                    disabled={sending || messages.length === 0}
+                  >
+                    <i className="fas fa-trash"></i> Clear Chat
+                  </button>
+                </form>
               </div>
+            </div>
+            {paymentRequestsData && paymentModalOpen && (
+              <PaymentModal
+                isOpen={paymentModalOpen}
+                onClose={() => setPaymentModalOpen(false)}
+                paymentRequirements={paymentRequestsData.paymentRequests}
+                onPaymentSuccess={handlePaymentSuccess}
+              />
             )}
-
-            {/* Show Approve & Cancel buttons when payment approval is required */}
-            {requirePaymentApproval && (
-              <>
-                <div className="payment-approval-message">
-                  {requirePaymentApproval}
-                </div>
-                <div className="payment-approval-container">
-                  <button
-                    className="btn-solid"
-                    onClick={handleApprovePayment}
-                    disabled={approveLoading || cancelLoading}
-                  >
-                    {approveLoading && <div className="btn-spinner" />}
-                    Approve
-                  </button>
-                  <button
-                    className="btn-outline"
-                    onClick={handleCancelPayment}
-                    disabled={cancelLoading || approveLoading}
-                  >
-                    {cancelLoading && <div className="btn-spinner outline" />}
-                    Cancel
-                  </button>
-                </div>
-              </>
-            )}
-
-            <div ref={messagesEndRef} />
           </div>
-
-          {/* Chat Input */}
-          <form
-            onSubmit={handleSend}
-            style={{ display: "flex", gap: 12, alignItems: "center" }}
-            autoComplete="off"
-          >
-            <input
-              type="text"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder={
-                isConnected ? "Type your message..." : "Connecting..."
-              }
-              disabled={sending || !isConnected}
-              style={{
-                flex: 1,
-                padding: "12px 16px",
-                border: "1px solid #e5e7eb",
-                borderRadius: 8,
-                fontSize: "1rem",
-                background: sending || !isConnected ? "#f3f4f6" : "#fff",
-                color: "#222",
-                outline: "none",
-                transition: "border-color 0.15s",
-              }}
-            />
-            <button
-              type="submit"
-              className="action-btn"
-              style={{ minWidth: 120 }}
-              disabled={sending || !isConnected}
-            >
-              <i className="fas fa-paper-plane"></i> Send
-            </button>
-            <button
-              type="button"
-              className="action-btn"
-              style={{ background: "#f6f8fa", color: "#222", minWidth: 120 }}
-              onClick={clearChat}
-              disabled={sending || messages.length === 0}
-            >
-              <i className="fas fa-trash"></i> Clear Chat
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
+        </SelectedWalletAccountContextProvider>
+      </EvmWalletProvider>
+    </WagmiProvider>
   );
 }
 

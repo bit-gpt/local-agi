@@ -1,4 +1,4 @@
-package serverwallet
+package h402
 
 import (
 	"bytes"
@@ -22,15 +22,19 @@ import (
 )
 
 type H402PaymentRequirement struct {
-	Namespace            string  `json:"namespace"`
-	TokenAddress         string  `json:"tokenAddress"`
-	AmountRequired       float64 `json:"amountRequired"`
-	AmountRequiredFormat string  `json:"amountRequiredFormat"`
-	PayToAddress         string  `json:"payToAddress"`
-	NetworkID            string  `json:"networkId"`
-	Description          string  `json:"description"`
-	Resource             string  `json:"resource"`
-	Scheme               string  `json:"scheme"`
+	Namespace               string  `json:"namespace"`
+	TokenAddress            string  `json:"tokenAddress"`
+	AmountRequired          float64 `json:"amountRequired"`
+	AmountRequiredFormat    string  `json:"amountRequiredFormat"`
+	PayToAddress            string  `json:"payToAddress"`
+	NetworkID               string  `json:"networkId"`
+	Description             string  `json:"description"`
+	Resource                string  `json:"resource"`
+	Scheme                  string  `json:"scheme"`
+	MimeType                string  `json:"mimeType"`
+	EstimatedProcessingTime int     `json:"estimatedProcessingTime"`
+	TokenDecimals           int     `json:"tokenDecimals"`
+	TokenSymbol             string  `json:"tokenSymbol"`
 }
 
 type H402Response struct {
@@ -113,8 +117,16 @@ func NewH402ClientWithWallets(wallets map[coretypes.ServerWalletType]coretypes.S
 	}
 }
 
-func MapNetworkIDToWalletType(networkID string) (coretypes.ServerWalletType, error) {
-	switch networkID {
+func NewH402ClientWithoutWallets(payLimits map[string]float64, agentID uuid.UUID, pool interface{}) *H402Client {
+	return &H402Client{
+		payLimits: payLimits,
+		agentID:   agentID,
+		pool:      pool,
+	}
+}
+
+func MapNetworkIDToWalletType(networkId string) (coretypes.ServerWalletType, error) {
+	switch networkId {
 	case "56", "97":
 		return coretypes.ServerWalletTypeBNB, nil
 	case "8453", "84532":
@@ -122,7 +134,7 @@ func MapNetworkIDToWalletType(networkID string) (coretypes.ServerWalletType, err
 	case "mainnet", "devnet", "testnet":
 		return coretypes.ServerWalletTypeSOL, nil
 	default:
-		if chainID, err := strconv.ParseInt(networkID, 10, 64); err == nil {
+		if chainID, err := strconv.ParseInt(networkId, 10, 64); err == nil {
 			switch chainID {
 			case 56, 97:
 				return coretypes.ServerWalletTypeBNB, nil
@@ -130,11 +142,11 @@ func MapNetworkIDToWalletType(networkID string) (coretypes.ServerWalletType, err
 				return coretypes.ServerWalletTypeBASE, nil
 			}
 		}
-		return "", fmt.Errorf("unsupported network ID: %s", networkID)
+		return "", fmt.Errorf("unsupported network ID: %s", networkId)
 	}
 }
 
-func (h *H402Client) SendH402RequestWithPaymentInfo(ctx context.Context, method, url string, requestBody []byte) (*H402ResponseWithPaymentInfo, error) {
+func (h *H402Client) makeInitialRequest(ctx context.Context, method, url string, requestBody []byte) (*http.Response, error) {
 	var bodyReader io.Reader
 	if requestBody != nil {
 		bodyReader = bytes.NewBuffer(requestBody)
@@ -155,6 +167,15 @@ func (h *H402Client) SendH402RequestWithPaymentInfo(ctx context.Context, method,
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make initial request: %v", err)
+	}
+
+	return resp, nil
+}
+
+func (h *H402Client) SendH402RequestWithPaymentInfo(ctx context.Context, method, url string, requestBody []byte) (*H402ResponseWithPaymentInfo, error) {
+	resp, err := h.makeInitialRequest(ctx, method, url, requestBody)
+	if err != nil {
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -262,6 +283,7 @@ func (h *H402Client) SendH402RequestWithPaymentInfo(ctx context.Context, method,
 	fmt.Println("Final Payment request:", req2)
 	fmt.Println("Wallet type:", wallet.GetWalletType())
 
+	client := &http.Client{}
 	finalResp, err := client.Do(req2)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make payment request: %v", err)
@@ -274,6 +296,172 @@ func (h *H402Client) SendH402RequestWithPaymentInfo(ctx context.Context, method,
 		AmountFormat: paymentReq.AmountRequiredFormat,
 		WalletType:   string(walletType),
 		Transaction:  paymentTx,
+		Namespace:    paymentReq.Namespace,
+		TokenAddress: paymentReq.TokenAddress,
+	}
+
+	if paymentResponseHeader := finalResp.Header.Get("X-Payment-Response"); paymentResponseHeader != "" {
+		if paymentResponseData, err := base64.StdEncoding.DecodeString(paymentResponseHeader); err == nil {
+			var responseData H402PaymentResponseData
+			if err := json.Unmarshal(paymentResponseData, &responseData); err == nil {
+				paymentInfo.Transaction = responseData.Transaction
+				paymentInfo.Namespace = responseData.Namespace
+			}
+		}
+	}
+
+	return &H402ResponseWithPaymentInfo{Response: finalResp, PaymentInfo: paymentInfo, PayLimitExceeded: nil, InfoError: nil}, nil
+}
+
+func (h *H402Client) SendH402RequestWithPaymentInfoAndWalletConnection(ctx context.Context, method, url string, requestBody []byte) (*H402ResponseWithPaymentInfo, error) {
+	resp, err := h.makeInitialRequest(ctx, method, url, requestBody)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusPaymentRequired {
+		return &H402ResponseWithPaymentInfo{Response: resp, PaymentInfo: nil, PayLimitExceeded: nil, InfoError: nil}, nil
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	fmt.Println("H402 response body:", string(body))
+
+	var h402Response H402Response
+	if err := json.Unmarshal(body, &h402Response); err != nil {
+		return nil, fmt.Errorf("failed to parse H402 response: %v", err)
+	}
+
+	if len(h402Response.Accepts) == 0 {
+		return nil, fmt.Errorf("no payment requirements found in H402 response")
+	}
+
+	paymentRequests := make([]map[string]interface{}, len(h402Response.Accepts))
+	for i, req := range h402Response.Accepts {
+		// Get token decimals and symbol from chain config if not provided
+		tokenDecimals := req.TokenDecimals
+		tokenSymbol := req.TokenSymbol
+
+		if tokenDecimals == 0 || tokenSymbol == "" {
+			walletType, err := MapNetworkIDToWalletType(req.NetworkID)
+			if err == nil {
+				walletTypeStr := string(walletType)
+
+				if tokenDecimals == 0 {
+					tokenDecimals = getDecimalsForToken(req.TokenAddress, walletTypeStr)
+				}
+				if tokenSymbol == "" {
+					tokenSymbol = detectTokenSymbolFromChainConfig(req.TokenAddress, walletTypeStr)
+				}
+			}
+		}
+
+		paymentRequests[i] = map[string]interface{}{
+			"selectedRequestID":       uuid.New().String(),
+			"namespace":               req.Namespace,
+			"tokenAddress":            req.TokenAddress,
+			"amountRequired":          req.AmountRequired,
+			"amountRequiredFormat":    req.AmountRequiredFormat,
+			"payToAddress":            req.PayToAddress,
+			"networkId":               req.NetworkID,
+			"description":             req.Description,
+			"resource":                req.Resource,
+			"scheme":                  req.Scheme,
+			"mimeType":                req.MimeType,
+			"estimatedProcessingTime": req.EstimatedProcessingTime,
+			"tokenDecimals":           tokenDecimals,
+			"tokenSymbol":             tokenSymbol,
+		}
+	}
+
+	requestID := uuid.New()
+
+	fmt.Println("User ID:", h.pool)
+
+	userIDStr := h.pool.(*state.AgentPool).GetUserID()
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID format: %v", err)
+	}
+
+	h402PendingRequest := models.H402PendingRequests{
+		ID:        requestID,
+		AgentID:   h.agentID,
+		UserID:    userID,
+		Status:    "Pending",
+		CreatedAt: time.Now(),
+	}
+
+	if err := db.DB.Create(&h402PendingRequest).Error; err != nil {
+		return nil, fmt.Errorf("failed to create h402 request: %v", err)
+	}
+
+	selectedRequestID, paymentHeader, err := h.waitForPaymentHeader(ctx, requestID, paymentRequests)
+
+	if err != nil {
+		return &H402ResponseWithPaymentInfo{
+			Response:  resp,
+			InfoError: err,
+		}, nil
+	}
+
+	var paymentReq H402PaymentRequirement
+
+	var found bool
+	for _, req := range paymentRequests {
+		if req["selectedRequestID"].(string) == selectedRequestID.String() {
+			paymentReq = H402PaymentRequirement{
+				Namespace:            req["namespace"].(string),
+				TokenAddress:         req["tokenAddress"].(string),
+				AmountRequired:       req["amountRequired"].(float64),
+				AmountRequiredFormat: req["amountRequiredFormat"].(string),
+				PayToAddress:         req["payToAddress"].(string),
+				NetworkID:            req["networkId"].(string),
+				Description:          req["description"].(string),
+				Resource:             req["resource"].(string),
+				Scheme:               req["scheme"].(string),
+			}
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return nil, fmt.Errorf("payment request with ID %s not found", selectedRequestID.String())
+	}
+
+	walletType, err := MapNetworkIDToWalletType(paymentReq.NetworkID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map network ID to wallet type: %v", err)
+	}
+
+	req2, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create payment request: %v", err)
+	}
+	req2.Header.Set("Content-Type", "application/json")
+	req2.Header.Set("X-PAYMENT", *paymentHeader)
+	req2.Header.Set("Access-Control-Expose-Headers", "X-PAYMENT-RESPONSE")
+
+	fmt.Println("Final Payment request:", req2)
+
+	client := &http.Client{}
+	finalResp, err := client.Do(req2)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make payment request: %v", err)
+	}
+
+	fmt.Println("Final Payment response:", finalResp)
+
+	paymentInfo := &PaymentInfo{
+		Amount:       paymentReq.AmountRequired,
+		AmountFormat: paymentReq.AmountRequiredFormat,
+		WalletType:   string(walletType),
+		Transaction:  *paymentHeader,
 		Namespace:    paymentReq.Namespace,
 		TokenAddress: paymentReq.TokenAddress,
 	}
@@ -418,6 +606,28 @@ func FormatPaymentMessage(paymentInfo *PaymentInfo) string {
 		amountStr, currency, walletName)
 }
 
+func FormatPaymentMessageWalletConnection(paymentInfo *PaymentInfo) string {
+	if paymentInfo == nil {
+		return ""
+	}
+
+	currency := detectTokenSymbolFromChainConfig(paymentInfo.TokenAddress, paymentInfo.WalletType)
+
+	var displayAmount float64
+	if paymentInfo.AmountFormat == "smallestUnit" {
+		displayAmount = convertSmallestUnitToHumanReadable(paymentInfo.Amount, paymentInfo.TokenAddress, paymentInfo.WalletType)
+	} else {
+		displayAmount = paymentInfo.Amount
+	}
+
+	decimals := getDecimalsForToken(paymentInfo.TokenAddress, paymentInfo.WalletType)
+
+	amountStr := formatAmountWithPrecision(displayAmount, decimals)
+
+	return fmt.Sprintf("Please mention this at the start of your next response: **You have paid %s %s to access this page.**",
+		amountStr, currency)
+}
+
 func FormatPayLimitMessage(payLimitError *PayLimitError) string {
 	if payLimitError == nil {
 		return ""
@@ -557,7 +767,7 @@ func (h *H402Client) waitForPayment(ctx context.Context, payLimitError *PayLimit
 }
 
 func (h *H402Client) setAgentPayLimitStatus(payLimitStatus string) error {
-	result := db.DB.Model(&models.Agent{}).Where("id = ?", h.agentID).Update("payLimitStatus", payLimitStatus)
+	result := db.DB.Model(&models.Agent{}).Where("ID = ?", h.agentID).Update("payLimitStatus", payLimitStatus)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -569,8 +779,89 @@ func (h *H402Client) setAgentPayLimitStatus(payLimitStatus string) error {
 
 func (h *H402Client) getAgentPayLimitStatus() (string, error) {
 	var payLimitStatus string
-	if err := db.DB.Model(&models.Agent{}).Where("id = ?", h.agentID).Pluck("payLimitStatus", &payLimitStatus).Error; err != nil {
+	if err := db.DB.Model(&models.Agent{}).Where("ID = ?", h.agentID).Pluck("payLimitStatus", &payLimitStatus).Error; err != nil {
 		return "", err
 	}
 	return payLimitStatus, nil
+}
+
+func (h *H402Client) waitForPaymentHeader(ctx context.Context, requestID uuid.UUID, paymentRequests []map[string]interface{}) (uuid.UUID, *string, error) {
+
+	if h.pool != nil {
+		if agentPool, ok := h.pool.(*state.AgentPool); ok {
+			manager := agentPool.GetManager(h.agentID.String())
+			if manager != nil {
+				requestData := struct {
+					RequestID       string                   `json:"requestId"`
+					PaymentRequests []map[string]interface{} `json:"paymentRequests"`
+				}{
+					RequestID:       requestID.String(),
+					PaymentRequests: paymentRequests,
+				}
+
+				paymentRequestsData, err := json.Marshal(requestData)
+				if err != nil {
+					return uuid.Nil, nil, fmt.Errorf("failed to marshal payment request: %v", err)
+				}
+
+				manager.Send(
+					sse.NewMessage(string(paymentRequestsData)).WithEvent("request_payment_header"))
+			}
+		}
+	}
+
+	fmt.Printf("Waiting for payment header for request %s (agent %s)...\n", requestID, h.agentID)
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeoutCtx.Done():
+			if err := h.setH402RequestStatus(requestID, "CANCELLED"); err != nil {
+				fmt.Printf("Failed to set request status to cancelled after timeout: %v\n", err)
+			}
+			fmt.Printf("Payment header timeout for request %s, setting status=Cancelled\n", requestID)
+			return uuid.Nil, nil, fmt.Errorf("payment header timeout")
+		case <-ticker.C:
+			selectedRequestID, paymentHeader, status, err := h.getH402RequestPaymentHeader(requestID)
+			if err != nil {
+				fmt.Printf("Error checking payment header status: %v\n", err)
+				continue
+			}
+			if status == "APPROVED" && selectedRequestID != uuid.Nil && paymentHeader != nil {
+				fmt.Printf("Payment header approved for request %s\n", requestID)
+				return selectedRequestID, paymentHeader, nil
+			}
+			if status == "CANCELLED" {
+				fmt.Printf("Payment header cancelled for request %s\n", requestID)
+				return uuid.Nil, nil, fmt.Errorf("payment header cancelled")
+			}
+		}
+	}
+}
+
+func (h *H402Client) setH402RequestStatus(requestID uuid.UUID, status string) error {
+	result := db.DB.Model(&models.H402PendingRequests{}).Where("ID = ?", requestID).Update("status", status)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no request found with ID %s", requestID)
+	}
+	return nil
+}
+
+func (h *H402Client) getH402RequestPaymentHeader(requestID uuid.UUID) (uuid.UUID, *string, string, error) {
+	var request models.H402PendingRequests
+	if err := db.DB.Where("ID = ?", requestID).First(&request).Error; err != nil {
+		return uuid.Nil, nil, "", err
+	}
+	if request.SelectedRequestID == nil {
+		return uuid.Nil, nil, request.Status, nil
+	}
+	return *request.SelectedRequestID, request.PaymentHeader, request.Status, nil
 }

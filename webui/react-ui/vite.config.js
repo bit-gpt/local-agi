@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig(({ mode }) => {
   // Load environment variables based on mode (development, production, etc)
@@ -13,7 +14,7 @@ export default defineConfig(({ mode }) => {
   }`;
 
   return {
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
     base: "/app", // Set the base path for production builds
     resolve: {
       alias: {

@@ -70,7 +70,20 @@ func (a *SearchAction) Run(ctx context.Context, sharedState *types.AgentSharedSt
 		results = append(results, u)
 	}
 
-	return types.ActionResult{Result: res, Metadata: map[string]interface{}{MetadataUrls: results}}, nil
+	// Enhance the result to include extracted URLs for easy browsing
+	enhancedResult := res
+	if len(results) > 0 {
+		enhancedResult += "\n\nEXTRACTED URLS FOR BROWSING:\n"
+		for i, url := range results {
+			if i >= 5 { // Limit to first 5 URLs to avoid overwhelming
+				break
+			}
+			enhancedResult += fmt.Sprintf("- %s\n", url)
+		}
+		enhancedResult += "\nCONSIDER: Use the 'browse' or 'scrape' actions to visit these URLs and get detailed information if the user requested specific content."
+	}
+
+	return types.ActionResult{Result: enhancedResult, Metadata: map[string]interface{}{MetadataUrls: results}}, nil
 }
 
 func (a *SearchAction) Definition() types.ActionDefinition {

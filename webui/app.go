@@ -692,7 +692,7 @@ func (a *App) UpdateAgentPayLimitStatus() func(c *fiber.Ctx) error {
 
 		agentId := agent.ID.String()
 
-		if err := db.DB.Model(&models.Agent{}).Where("id = ?", agent.ID).Update("payLimitStatus", requestBody.PayLimitStatus).Error; err != nil {
+		if err := db.DB.Model(&models.Agent{}).Where("ID = ?", agent.ID).Update("payLimitStatus", requestBody.PayLimitStatus).Error; err != nil {
 			return errorJSONMessage(c, "Failed to update pay limit status in DB: "+err.Error())
 		}
 
@@ -2893,5 +2893,89 @@ func (a *App) GetUsage() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Failed to fetch usage data: "+err.Error())
 		}
 		return c.JSON(usages)
+	}
+}
+
+func (a *App) SubmitPaymentHeader() func(c *fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
+		userIDStr, ok := c.Locals("id").(string)
+		if !ok || userIDStr == "" {
+			return errorJSONMessage(c, "User ID missing")
+		}
+
+		requestIDStr := c.Params("requestId")
+		if requestIDStr == "" {
+			return errorJSONMessage(c, "Request ID missing")
+		}
+
+		requestID, err := uuid.Parse(requestIDStr)
+		if err != nil {
+			return errorJSONMessage(c, "Invalid request ID format")
+		}
+
+		var payload struct {
+			SelectedRequestID string `json:"selectedRequestID"`
+			PaymentHeader     string `json:"paymentHeader"`
+			Status            string `json:"status"`
+		}
+
+		if err := c.BodyParser(&payload); err != nil {
+			return errorJSONMessage(c, "Invalid request body: "+err.Error())
+		}
+
+		var request models.H402PendingRequests
+		if err := db.DB.Where("ID = ? AND UserID = ?", requestID, userIDStr).
+			First(&request).Error; err != nil {
+			return errorJSONMessage(c, "Request not found or access denied")
+		}
+
+		var responseMessage string
+		var responseStatus string
+
+		if payload.Status == "CANCELLED" {
+			if err := db.DB.Model(&request).Updates(map[string]interface{}{
+				"Status": "CANCELLED",
+			}).Error; err != nil {
+				return errorJSONMessage(c, "Failed to update request: "+err.Error())
+			}
+			responseMessage = "Signed transaction submitted for cancelled request"
+			responseStatus = "CANCELLED"
+		} else {
+
+			if payload.PaymentHeader == "" {
+				return errorJSONMessage(c, "Signed transaction is required")
+			}
+
+			if payload.SelectedRequestID == "" {
+				return errorJSONMessage(c, "Selected request ID is required")
+			}
+
+			selectedRequestID, err := uuid.Parse(payload.SelectedRequestID)
+
+			if err != nil {
+				return errorJSONMessage(c, "Invalid selected request ID format")
+			}
+
+			if err := db.DB.Model(&request).Updates(map[string]interface{}{
+				"PaymentHeader":     payload.PaymentHeader,
+				"SelectedRequestID": selectedRequestID,
+				"Status":            "APPROVED",
+			}).Error; err != nil {
+				return errorJSONMessage(c, "Failed to update request: "+err.Error())
+			}
+			responseMessage = "Signed transaction submitted successfully"
+			responseStatus = "APPROVED"
+		}
+
+		return c.JSON(fiber.Map{
+			"status":  "success",
+			"message": responseMessage,
+			"data": fiber.Map{
+				"requestId":         requestID.String(),
+				"selectedRequestID": payload.SelectedRequestID,
+				"paymentHeader":     payload.PaymentHeader,
+				"status":            responseStatus,
+			},
+		})
 	}
 }

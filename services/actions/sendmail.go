@@ -2,7 +2,9 @@ package actions
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net"
 	"net/smtp"
 
 	"github.com/mudler/LocalAGI/core/types"
@@ -41,19 +43,131 @@ func (a *SendMailAction) Run(ctx context.Context, sharedState *types.AgentShared
 		return types.ActionResult{}, err
 	}
 
-	// Authentication.
-	auth := smtp.PlainAuth("", a.email, a.password, a.smtpHost)
+	// Create the email message with proper headers
+	message := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s", a.email, result.To, result.Subject, result.Message)
 
-	// Sending email.
-	err = smtp.SendMail(
-		fmt.Sprintf("%s:%s", a.smtpHost, a.smtpPort),
-		auth, a.email, []string{
-			result.To,
-		}, []byte(result.Message))
+	// Send email with proper SSL/TLS handling
+	err = a.sendEmailWithTLS(result.To, []byte(message))
 	if err != nil {
 		return types.ActionResult{}, err
 	}
 	return types.ActionResult{Result: fmt.Sprintf("Email sent to %s", result.To)}, nil
+}
+
+// sendEmailWithTLS handles both SSL (port 465) and STARTTLS (port 587) connections
+func (a *SendMailAction) sendEmailWithTLS(to string, message []byte) error {
+	serverAddr := fmt.Sprintf("%s:%s", a.smtpHost, a.smtpPort)
+
+	// Check if we're using SSL port (465) or STARTTLS port (587)
+	if a.smtpPort == "465" {
+		// SSL connection for port 465
+		return a.sendWithSSL(serverAddr, to, message)
+	} else {
+		// STARTTLS connection for port 587 and others
+		return a.sendWithSTARTTLS(serverAddr, to, message)
+	}
+}
+
+// sendWithSSL handles SSL connections (port 465)
+func (a *SendMailAction) sendWithSSL(serverAddr, to string, message []byte) error {
+	// Create TLS connection
+	tlsConfig := &tls.Config{
+		ServerName: a.smtpHost,
+	}
+
+	conn, err := tls.Dial("tcp", serverAddr, tlsConfig)
+	if err != nil {
+		return fmt.Errorf("failed to connect via SSL: %v", err)
+	}
+	defer conn.Close()
+
+	// Create SMTP client
+	client, err := smtp.NewClient(conn, a.smtpHost)
+	if err != nil {
+		return fmt.Errorf("failed to create SMTP client: %v", err)
+	}
+	defer client.Quit()
+
+	// Authenticate - use username (API key) instead of email for Mailjet
+	auth := smtp.PlainAuth("", a.username, a.password, a.smtpHost)
+	if err = client.Auth(auth); err != nil {
+		return fmt.Errorf("authentication failed: %v", err)
+	}
+
+	// Send email
+	if err = client.Mail(a.email); err != nil {
+		return fmt.Errorf("failed to set sender: %v", err)
+	}
+
+	if err = client.Rcpt(to); err != nil {
+		return fmt.Errorf("failed to set recipient: %v", err)
+	}
+
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("failed to get data writer: %v", err)
+	}
+
+	_, err = w.Write(message)
+	if err != nil {
+		return fmt.Errorf("failed to write message: %v", err)
+	}
+
+	return w.Close()
+}
+
+// sendWithSTARTTLS handles STARTTLS connections (port 587 and others)
+func (a *SendMailAction) sendWithSTARTTLS(serverAddr, to string, message []byte) error {
+	// Connect to server
+	conn, err := net.Dial("tcp", serverAddr)
+	if err != nil {
+		return fmt.Errorf("failed to connect: %v", err)
+	}
+	defer conn.Close()
+
+	// Create SMTP client
+	client, err := smtp.NewClient(conn, a.smtpHost)
+	if err != nil {
+		return fmt.Errorf("failed to create SMTP client: %v", err)
+	}
+	defer client.Quit()
+
+	// Start TLS if supported
+	if ok, _ := client.Extension("STARTTLS"); ok {
+		tlsConfig := &tls.Config{
+			ServerName: a.smtpHost,
+		}
+		if err = client.StartTLS(tlsConfig); err != nil {
+			return fmt.Errorf("failed to start TLS: %v", err)
+		}
+	}
+
+	// Authenticate - use username (API key) instead of email for Mailjet
+	auth := smtp.PlainAuth("", a.username, a.password, a.smtpHost)
+	if err = client.Auth(auth); err != nil {
+		return fmt.Errorf("authentication failed: %v", err)
+	}
+
+	// Send email
+	if err = client.Mail(a.email); err != nil {
+		return fmt.Errorf("failed to set sender: %v", err)
+	}
+
+	if err = client.Rcpt(to); err != nil {
+		return fmt.Errorf("failed to set recipient: %v", err)
+	}
+
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("failed to get data writer: %v", err)
+	}
+
+	_, err = w.Write(message)
+	if err != nil {
+		return fmt.Errorf("failed to write message: %v", err)
+	}
+
+	return w.Close()
 }
 
 func (a *SendMailAction) Definition() types.ActionDefinition {

@@ -25,6 +25,7 @@ const parameterReasoningPrompt = `You are tasked with generating the optimal par
 %s
 
 Current Date and Time: %s
+Agent Name: %s
 
 Your task is to:
 1. Generate the best possible values for each required parameter
@@ -32,6 +33,15 @@ Your task is to:
 3. If the parameter requires text or documentation, provide comprehensive, well-structured content
 4. Ensure all parameters are complete and ready to be used
 5. When users mention temporal references like "today", "this week", "recent", etc., use the current date and time provided above
+
+SPECIAL FORMATTING RULES:
+- For EMAIL actions (send_email): 
+  * Use PLAIN TEXT formatting ONLY - NO markdown syntax whatsoever
+  * Do NOT use **bold**, *italic*, bullet points (-), numbered lists (1.), or any markdown
+  * Instead use: CAPITAL LETTERS for emphasis, line breaks for structure, plain text formatting
+  * Sign emails with the agent's actual name (provided above), not "[Your Name]" or generic placeholders
+  * Example: "Best regards,\n[Agent Name]" (replace [Agent Name] with the actual agent name provided)
+- For all other actions: Use appropriate formatting as needed
 
 Focus on quality and completeness. Do not explain your reasoning or analyze the action's purpose - just provide the best possible parameter values.`
 
@@ -63,13 +73,25 @@ func (a *Agent) decision(
 
 Current Date and Time: %s
 
+EXECUTION GUIDELINES:
+- Execute user-requested actions DIRECTLY without asking for permission or consent
+- When a user asks you to send an email, search something, or perform any action - DO IT IMMEDIATELY
+- Do not ask "Do you want me to..." or "Should I..." or "Please confirm..." - just execute the action
+- The user has already given consent by making the request
+
+EMAIL SPECIFIC RULES:
+- For send_email actions: Use PLAIN TEXT only - NO markdown formatting in email content
+- Do NOT use **bold**, *italic*, bullet points (-), numbered lists (1.), or any markdown in emails
+- Use plain text with proper spacing, line breaks, and CAPITAL LETTERS for emphasis if needed
+
 Examples:
 - For "weather in Paris and Boston" → use one search like "current weather in Paris and Boston"
 - For "tell me about X and Y" → use one search like "information about X and Y"
+- For "email me the results at user@example.com" → send the email directly using send_email action (plain text only)
 - For multiple related items → combine them into one comprehensive query
 - When users mention temporal references like "today", "this week", "recent", etc., use the current date and time provided above
 
-Choose the most appropriate single tool call to fulfill the user's complete request.`, time.Now().Format(time.RFC3339))
+Choose the most appropriate single tool call to fulfill the user's complete request and execute it immediately.`, time.Now().Format(time.RFC3339))
 
 		enhancedConversation = append([]openai.ChatCompletionMessage{
 			{
@@ -381,7 +403,8 @@ func (a *Agent) generateParameters(job *types.Job, pickTemplate string, act type
 		parameterReasoningPrompt := fmt.Sprintf(parameterReasoningPrompt,
 			act.Definition().Name,
 			formatProperties(act.Definition().Properties),
-			time.Now().Format(time.RFC3339))
+			time.Now().Format(time.RFC3339),
+			a.Character.Name)
 
 		// Get initial reasoning about parameters using askLLM
 		paramReasoningMsg, err := a.askLLM(job.GetContext(),
@@ -677,6 +700,7 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 
 	// Create a detailed prompt for reasoning that includes available actions and their properties
 	reasoningPrompt := "Analyze the current situation and determine the best course of action. Consider the following:\n\n"
+	reasoningPrompt += "CRITICAL: When the user requests an action to be performed, execute it immediately without asking for permission.\n\n"
 	reasoningPrompt += "Available Actions:\n"
 	for _, act := range a.availableActions() {
 		reasoningPrompt += fmt.Sprintf("- %s: %s\n", act.Definition().Name, act.Definition().Description)
@@ -688,7 +712,7 @@ func (a *Agent) pickAction(job *types.Job, templ string, messages []openai.ChatC
 		}
 		reasoningPrompt += "\n"
 	}
-	reasoningPrompt += "\nProvide a detailed reasoning about what action would be most appropriate in this situation and why. You can also just reply with a simple message by choosing the 'reply' or 'answer' action."
+	reasoningPrompt += "\nProvide a detailed reasoning about what action would be most appropriate in this situation and why. If the user has requested a specific action (like sending an email, searching, etc.), execute that action directly. You can also just reply with a simple message by choosing the 'reply' or 'answer' action only when no specific action is needed."
 
 	// Get reasoning using askLLM
 	reasoningMsg, err := a.askLLM(job.GetContext(),
