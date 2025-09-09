@@ -52,33 +52,30 @@ export function EvmWalletProvider({ children }) {
       const connector = getConnector(walletType);
 
       let result = await connect(config, { connector });
-      console.log('conffiggg', config)
-      console.log('resulttt', result)
-      console.log('connector', connector)
       validateConnectionResult(result);
 
       const initialClient = await getWalletClient(config, {
         account: result.accounts[0],
       });
       validateWalletClient(initialClient);
+    
+        result = await handleChainSwitch({
+          initialClient,
+          targetChain,
+          networkName,
+          config,
+          account: result.accounts[0],
+          connector,
+          result,
+        });
 
-      result = await handleChainSwitch({
-        initialClient,
-        targetChain,
-        networkName,
-        config,
-        account: result.accounts[0],
-        connector,
-        result,
-      });
+        validateConnectionResult(result);
 
-      validateConnectionResult(result);
-
-      const baseClient = await getWalletClient(config, {
-        account: result.accounts[0],
-        chainId: targetChain.id,
-      });
-      validateWalletClient(baseClient);
+        const baseClient = await getWalletClient(config, {
+          account: result.accounts[0],
+          chainId: targetChain.id,
+        });
+        validateWalletClient(baseClient);
 
       const client = baseClient.extend(publicActions);
 

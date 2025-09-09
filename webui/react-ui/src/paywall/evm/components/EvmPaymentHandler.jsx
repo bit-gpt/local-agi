@@ -195,13 +195,16 @@ export default function EvmPaymentHandler({
     ["connecting", "processing", "success"].includes(paymentStatus) ||
     (!connectedAddress && !selectedWallet);
 
+
+    console.log('ss', paymentStatus)
+
   return (
     <div className="flex flex-col w-full space-y-4">
       <EvmWalletSelector
         chainId={networkId}
         onWalletSelect={handleWalletSelect}
         selectedWallet={selectedWallet}
-        disabled={paymentStatus === "connecting"}
+        disabled={["approving", "connecting", "processing"].includes(paymentStatus)}
       />
 
       {connectedAddress &&
@@ -217,9 +220,6 @@ export default function EvmPaymentHandler({
             onProcessing={handlePaymentProcessing}
             paymentAttemptRef={paymentAttemptRef}
             networkId={networkId}
-            disconnectWallet={disconnectWallet}
-            selectedWallet={selectedWallet}
-            setSelectedWallet={setSelectedWallet}
           />
         )}
 
@@ -243,9 +243,6 @@ function EvmPaymentProcessor({
   onProcessing,
   paymentAttemptRef,
   networkId = "bsc",
-  disconnectWallet,
-  selectedWallet,
-  setSelectedWallet,
 }) {
   const hasAttemptedRef = useRef(false);
 
@@ -282,26 +279,9 @@ function EvmPaymentProcessor({
         const expectedChainId = parseInt(getChainId(networkId));
 
         if (currentChainId !== expectedChainId) {
-          // For Trust Wallet, disconnect and let user reconnect on correct network
-          if (selectedWallet === "trust") {
-            console.log("[DEBUG] Trust Wallet on wrong chain, disconnecting...");
-            try {
-              await disconnectWallet();
-              setSelectedWallet(null);
-              throw new Error(
-                `Trust Wallet was on wrong network and has been disconnected. Please reconnect to ${networkId.toUpperCase()} network and try again.`
-              );
-            } catch (disconnectError) {
-              console.error("[DEBUG] Failed to disconnect Trust Wallet:", disconnectError);
-              throw new Error(
-                `Trust Wallet is on wrong network. Please switch to ${networkId.toUpperCase()} network and try again.`
-              );
-            }
-          } else {
-            throw new Error(
-              `Wallet is on wrong network. Please switch to ${networkId.toUpperCase()} network and try again.`
-            );
-          }
+          throw new Error(
+            `Wallet is on wrong network. Please switch to ${networkId.toUpperCase()} network and try again.`
+          );
         }
 
         const finalPaymentRequirements = {

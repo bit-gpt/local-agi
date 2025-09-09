@@ -25,33 +25,6 @@ export default function EvmWalletSelector({
         });
       }
 
-      if (window.ethereum?.isCoinbaseWallet) {
-        wallets.push({
-          id: "coinbase",
-          name: "Coinbase Wallet",
-          icon: "/app/wallets/coinbase.svg",
-          type: "evm",
-        });
-      }
-
-      if (window.ethereum?.isRabby) {
-        wallets.push({
-          id: "rabby",
-          name: "Rabby",
-          icon: "/app/wallets/rabby.svg",
-          type: "evm",
-        });
-      }
-
-      if (window.trustwallet?.isTrust) {
-        wallets.push({
-          id: "trust",
-          name: "Trust Wallet",
-          icon: "/app/wallets/trustwallet.svg",
-          type: "evm",
-        });
-      }
-
       if (window.phantom && chainId !== "solana") {
         wallets.push({
           id: "phantom",
@@ -71,9 +44,6 @@ export default function EvmWalletSelector({
       const supportedWallets = wallets.filter((wallet) => {
         const chainSupport = {
           metamask: ["bsc", "base"],
-          coinbase: ["bsc", "base"],
-          rabby: ["bsc", "base"],
-          trust: ["bsc", "base"],
           phantom: ["base"],
           walletconnect: ["bsc", "base"],
         };

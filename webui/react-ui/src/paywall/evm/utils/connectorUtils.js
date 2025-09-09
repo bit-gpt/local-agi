@@ -1,7 +1,6 @@
 import {
   injected,
   metaMask,
-  coinbaseWallet,
   walletConnect,
 } from "wagmi/connectors";
 import { bsc, base } from "viem/chains";
@@ -15,15 +14,19 @@ export function getConnector(walletType) {
   switch (walletType) {
     case "metamask":
       return metaMask();
-    case "coinbase":
-      return coinbaseWallet();
-    case "rabby":
-      return injected({ shimDisconnect: true, target: "rabby" });
     case "phantom":
       return injected({ shimDisconnect: true, target: "phantom" });
-    case "trust":
-      return injected({ shimDisconnect: true, target: "trust" });
     case "walletconnect":
+      // Check if WalletConnect is already initialized by Privy
+      const existingWC = window.ethereum?.isWalletConnect || 
+                          localStorage.getItem('walletconnect') ||
+                          document.querySelector('[data-testid*="walletconnect"]');
+      
+      if (existingWC) {
+        console.warn('WalletConnect already initialized by Privy, using injected instead');
+        return injected({ shimDisconnect: true });
+      }
+      
       return walletConnect({
         projectId: "3fbb6bba6f1de962d911bb5b5c9dba88",
       });

@@ -98,7 +98,7 @@ export default function SolanaPaymentHandler({
       <SolanaWalletSelector
         onWalletSelect={handleWalletSelect}
         selectedWallet={selectedWallet}
-        disabled={paymentStatus === "connecting"}
+        disabled={["approving", "connecting", "processing"].includes(paymentStatus)}
       />
       {selectedWallet && paymentStatus === "connecting" && (
         <WalletConnectionManager

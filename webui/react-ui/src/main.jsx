@@ -24,9 +24,19 @@ createRoot(document.getElementById("root")).render(
     <PrivyProvider
       appId={import.meta.env.VITE_PRIVY_APP_ID}
       config={{
+        supportedChains: [
+          // Your chains without WalletConnect-specific config
+          {
+            id: 1,
+            name: 'Ethereum',
+            rpcUrls: ['https://rpc.ankr.com/eth'],
+            // Don't include WalletConnect-specific properties
+          },
+        ],
         loginMethods: ["wallet", "email"],
         appearance: {
           theme: "light",
+          walletList: ['phantom', 'metamask', 'coinbase_wallet', 'rainbow'],
         },
       }}
     >
