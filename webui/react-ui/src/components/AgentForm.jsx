@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Import form sections
@@ -33,7 +33,100 @@ const AgentForm = ({
   const [activeSection, setActiveSection] = useState(
     isGroupForm ? "model-section" : "basic-section"
   );
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
   const isMobile = useIsMobile();
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [isDropdownOpen]);
+
+  // Navigation options for easier management
+  const getNavigationOptions = () => {
+    const options = [];
+    
+    if (!isGroupForm) {
+      options.push({
+        id: "basic-section",
+        icon: "fas fa-info-circle",
+        label: isMobile ? "Basic Info" : "Basic Information"
+      });
+    }
+    
+    options.push(
+      {
+        id: "model-section",
+        icon: "fas fa-brain",
+        label: isMobile ? "Model" : "Model Settings"
+      },
+      {
+        id: "connectors-section",
+        icon: "fas fa-plug",
+        label: "Connectors"
+      },
+      {
+        id: "filters-section",
+        icon: "fas fa-shield",
+        label: "Filters & Triggers",
+        hasTag: true
+      },
+      {
+        id: "actions-section",
+        icon: "fas fa-bolt",
+        label: "Actions"
+      },
+      {
+        id: "mcp-section",
+        icon: "fas fa-server",
+        label: isMobile ? "MCP" : "MCP Servers"
+      },
+      {
+        id: "memory-section",
+        icon: "fas fa-memory",
+        label: isMobile ? "Memory" : "Memory Settings"
+      },
+      {
+        id: "prompts-section",
+        icon: "fas fa-comment-alt",
+        label: "Prompts & Goals"
+      },
+      {
+        id: "advanced-section",
+        icon: "fas fa-cogs",
+        label: isMobile ? "Advanced" : "Advanced Settings"
+      }
+    );
+
+    if (isEdit && formData.server_wallets_enabled) {
+      options.push({
+        id: "server-wallets-section",
+        icon: "fas fa-wallet",
+        label: "Server Wallets"
+      });
+    }
+
+    if (isEdit) {
+      options.push({
+        id: "export-section",
+        icon: "fas fa-file-export",
+        label: isMobile ? "Export" : "Export Data"
+      });
+    }
+
+    return options;
+  };
 
   // Handle input changes
   const handleInputChange = (e) => {
@@ -167,115 +260,65 @@ const AgentForm = ({
     );
   }
 
+  const navigationOptions = getNavigationOptions();
+  const currentSection = navigationOptions.find(option => option.id === activeSection);
+
   return (
     <div className="agent-form-container">
-      {/* Wizard Sidebar */}
-      <div className="wizard-sidebar">
-        <ul className="wizard-nav">
-          {!isGroupForm && (
-            <li
-              className={`wizard-nav-item ${
-                activeSection === "basic-section" ? "active" : ""
-              }`}
-              onClick={() => handleSectionChange("basic-section")}
-            >
-              <i className="fas fa-info-circle"></i>
-              {isMobile ? "Basic Info" : "Basic Information"}
-            </li>
+      {/* Mobile Dropdown Navigation */}
+      {isMobile ? (
+        <div className="wizard-mobile-dropdown" ref={dropdownRef}>
+          <div 
+            className="wizard-dropdown-trigger"
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+          >
+            <div className="wizard-dropdown-trigger-content">
+              <i className={currentSection?.icon || "fas fa-cogs"}></i>
+              <span>{currentSection?.label || "Select Section"}</span>
+            </div>
+            <i className={`fas fa-chevron-${isDropdownOpen ? 'up' : 'down'} dropdown-arrow`}></i>
+          </div>
+          {isDropdownOpen && (
+            <div className="wizard-dropdown-menu">
+              {navigationOptions.map((option) => (
+                <div
+                  key={option.id}
+                  className={`wizard-dropdown-item ${
+                    activeSection === option.id ? "active" : ""
+                  }`}
+                  onClick={() => {
+                    handleSectionChange(option.id);
+                    setIsDropdownOpen(false);
+                  }}
+                >
+                  <i className={option.icon}></i>
+                  <span>{option.label}</span>
+                  {option.hasTag && <span className="advanced-tag">Advanced</span>}
+                </div>
+              ))}
+            </div>
           )}
-          <li
-            className={`wizard-nav-item ${
-              activeSection === "model-section" ? "active" : ""
-            }`}
-            onClick={() => handleSectionChange("model-section")}
-          >
-            <i className="fas fa-brain"></i>
-            {isMobile ? "Model" : "Model Settings"}
-          </li>
-          <li
-            className={`wizard-nav-item ${
-              activeSection === "connectors-section" ? "active" : ""
-            }`}
-            onClick={() => handleSectionChange("connectors-section")}
-          >
-            <i className="fas fa-plug"></i>
-            Connectors
-          </li>
-          <li
-            className={`wizard-nav-item ${activeSection === 'filters-section' ? 'active' : ''}`}
-            onClick={() => handleSectionChange('filters-section')}
-          >
-            <i className="fas fa-shield"></i>
-            Filters &amp; Triggers
-            <span className="advanced-tag">Advanced</span>
-          </li>
-          <li 
-            className={`wizard-nav-item ${activeSection === 'actions-section' ? 'active' : ''}`} 
-            onClick={() => handleSectionChange('actions-section')}
-          >
-            <i className="fas fa-bolt"></i>
-            Actions
-          </li>
-          <li
-            className={`wizard-nav-item ${
-              activeSection === "mcp-section" ? "active" : ""
-            }`}
-            onClick={() => handleSectionChange("mcp-section")}
-          >
-            <i className="fas fa-server"></i>
-            {isMobile ? "MCP" : "MCP Servers"}
-          </li>
-          <li
-            className={`wizard-nav-item ${
-              activeSection === "memory-section" ? "active" : ""
-            }`}
-            onClick={() => handleSectionChange("memory-section")}
-          >
-            <i className="fas fa-memory"></i>
-            {isMobile ? "Memory" : "Memory Settings"}
-          </li>
-          <li
-            className={`wizard-nav-item ${
-              activeSection === "prompts-section" ? "active" : ""
-            }`}
-            onClick={() => handleSectionChange("prompts-section")}
-          >
-            <i className="fas fa-comment-alt"></i>
-            Prompts & Goals
-          </li>
-          <li
-            className={`wizard-nav-item ${
-              activeSection === "advanced-section" ? "active" : ""
-            }`}
-            onClick={() => handleSectionChange("advanced-section")}
-          >
-            <i className="fas fa-cogs"></i>
-            {isMobile ? "Advanced" : "Advanced Settings"}
-          </li>
-          {isEdit && formData.server_wallets_enabled && (
-            <li
-              className={`wizard-nav-item ${
-                activeSection === "server-wallets-section" ? "active" : ""
-              }`}
-              onClick={() => handleSectionChange("server-wallets-section")}
-            >
-              <i className="fas fa-wallet"></i>
-              Server Wallets
-            </li>
-          )}
-          {isEdit && (
-            <li
-              className={`wizard-nav-item ${
-                activeSection === "export-section" ? "active" : ""
-              }`}
-              onClick={() => handleSectionChange("export-section")}
-            >
-              <i className="fas fa-file-export"></i>
-              {isMobile ? "Export" : "Export Data"}
-            </li>
-          )}
-        </ul>
-      </div>
+        </div>
+      ) : (
+        /* Desktop Sidebar */
+        <div className="wizard-sidebar">
+          <ul className="wizard-nav">
+            {navigationOptions.map((option) => (
+              <li
+                key={option.id}
+                className={`wizard-nav-item ${
+                  activeSection === option.id ? "active" : ""
+                }`}
+                onClick={() => handleSectionChange(option.id)}
+              >
+                <i className={option.icon}></i>
+                {option.label}
+                {option.hasTag && <span className="advanced-tag">Advanced</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Form Content */}
       <div className="form-content-area">
