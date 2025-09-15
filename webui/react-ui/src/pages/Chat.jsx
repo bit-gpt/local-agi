@@ -11,6 +11,7 @@ import { SelectedWalletAccountContextProvider } from "../paywall/solana/context/
 import { EvmWalletProvider } from "../paywall/evm/context/EvmWalletContext";
 import { WagmiProvider } from "wagmi";
 import { config } from "../paywall/evm/config/wagmi";
+import { useAgent } from "../hooks/useAgent";
 
 const PAY_LIMIT_STATUS = {
   APPROVED: "APPROVED",
@@ -216,6 +217,8 @@ function Chat() {
     clearChat,
     clearError,
   } = useChat(id, agentConfig?.model, handleStatusCompleted);
+
+  const { agent } = useAgent(id);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -488,7 +491,7 @@ function Chat() {
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       placeholder={
-                        isConnected ? "Type your message..." : "Connecting..."
+                        isConnected ? "Type your message..." : !agent?.active ? "Agent is paused..." : "Connecting..."
                       }
                       disabled={sending || !isConnected}
                       className="chat-input"
