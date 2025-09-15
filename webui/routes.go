@@ -236,7 +236,7 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 
 		// 2. Fetch non-archived agents directly from MySQL
 		var dbAgents []models.Agent
-		if err := db.DB.Where("UserId = ? AND archive = false", userUUID).Find(&dbAgents).Error; err != nil {
+		if err := db.DB.Where("UserId = ? AND archive = false", userUUID).Order("createdAt DESC").Find(&dbAgents).Error; err != nil {
 			return errorJSONMessage(c, "Failed to fetch agents: "+err.Error())
 		}
 

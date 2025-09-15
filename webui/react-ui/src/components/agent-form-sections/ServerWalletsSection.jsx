@@ -58,7 +58,7 @@ const ServerWalletsSection = ({ fetchServerWallets, agent, agentId, setAgent }) 
         serverWallets?.length > 0 && (
           <div className="wallets-grid">
             {serverWallets.map((serverWallet) => (
-              <ServerWalletCard key={serverWallet.address} serverWallet={serverWallet} />
+              <ServerWalletCard key={serverWallet.type} serverWallet={serverWallet} />
             ))}
           </div>
         )

@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
 import Header from "../components/Header";
-import { actionApi, agentApi } from '../utils/api';
-import FormFieldDefinition from '../components/common/FormFieldDefinition';
-import hljs from 'highlight.js/lib/core';
-import json from 'highlight.js/lib/languages/json';
-import 'highlight.js/styles/atom-one-dark.css';
-hljs.registerLanguage('json', json);
+import { actionApi, agentApi } from "../utils/api";
+import FormFieldDefinition from "../components/common/FormFieldDefinition";
+import hljs from "highlight.js/lib/core";
+import json from "highlight.js/lib/languages/json";
+import "highlight.js/styles/atom-one-dark.css";
+hljs.registerLanguage("json", json);
 
 function ActionsPlayground() {
   const { showToast } = useOutletContext();
@@ -53,8 +53,8 @@ function ActionsPlayground() {
         const metadata = await agentApi.getAgentConfigMetadata();
         setAgentMetadata(metadata);
       } catch (err) {
-        console.error('Error fetching agent metadata:', err);
-        showToast('Failed to load agent metadata', 'error');
+        console.error("Error fetching agent metadata:", err);
+        showToast("Failed to load agent metadata", "error");
       }
     };
 
@@ -68,9 +68,11 @@ function ActionsPlayground() {
     const fetchActionDefinition = async () => {
       try {
         // Get config fields from agent metadata
-        const actionMeta = agentMetadata?.actions?.find(action => action.name === selectedAction);
+        const actionMeta = agentMetadata?.actions?.find(
+          (action) => action.name === selectedAction
+        );
         const configFields = actionMeta?.fields || [];
-        console.debug('Config fields:', configFields);
+        console.debug("Config fields:", configFields);
         setConfigFields(configFields);
 
         // Parse current config to pass to action definition
@@ -78,12 +80,15 @@ function ActionsPlayground() {
         try {
           currentConfig = JSON.parse(configJson);
         } catch (err) {
-          console.error('Error parsing current config:', err);
+          console.error("Error parsing current config:", err);
         }
 
         // Get parameter fields from action definition
-        const paramFields = await actionApi.getActionDefinition(selectedAction, currentConfig);
-        console.debug('Parameter fields:', paramFields);
+        const paramFields = await actionApi.getActionDefinition(
+          selectedAction,
+          currentConfig
+        );
+        console.debug("Parameter fields:", paramFields);
         setParamFields(paramFields);
 
         // Reset JSON to match the new fields
@@ -91,8 +96,8 @@ function ActionsPlayground() {
         setParamsJson(JSON.stringify({}, null, 2));
         setResult(null);
       } catch (err) {
-        console.error('Error fetching action definition:', err);
-        showToast('Failed to load action definition', 'error');
+        console.error("Error fetching action definition:", err);
+        showToast("Failed to load action definition", "error");
       }
     };
 
@@ -101,8 +106,8 @@ function ActionsPlayground() {
 
   const handleActionChange = (e) => {
     setSelectedAction(e.target.value);
-    setConfigJson('{}');
-    setParamsJson('{}');
+    setConfigJson("{}");
+    setParamsJson("{}");
     setResult(null);
   };
 
@@ -111,12 +116,12 @@ function ActionsPlayground() {
     let value;
     if (e && e.target) {
       const fieldName = e.target.name;
-      const fieldDef = fields.find(f => f.name === fieldName);
+      const fieldDef = fields.find((f) => f.name === fieldName);
       const fieldType = fieldDef ? fieldDef.type : undefined;
-      if (fieldType === 'checkbox') {
+      if (fieldType === "checkbox") {
         value = e.target.checked;
-      } else if (fieldType === 'number') {
-        value = e.target.value === '' ? '' : String(e.target.value);
+      } else if (fieldType === "number") {
+        value = e.target.value === "" ? "" : String(e.target.value);
       } else {
         value = e.target.value;
       }
@@ -131,7 +136,7 @@ function ActionsPlayground() {
       config[field] = value;
       setConfigJson(JSON.stringify(config, null, 2));
     } catch (err) {
-      console.error('Error updating config:', err);
+      console.error("Error updating config:", err);
     }
   };
 
@@ -141,7 +146,7 @@ function ActionsPlayground() {
       params[field] = value;
       setParamsJson(JSON.stringify(params, null, 2));
     } catch (err) {
-      console.error('Error updating params:', err);
+      console.error("Error updating params:", err);
     }
   };
 
@@ -197,129 +202,147 @@ function ActionsPlayground() {
             description="Test and execute actions directly from the UI."
           />
         </div>
-
-        <div
-          className="agent-form-container"
-          style={{ gap: 40, display: "flex", width: "100%" }}
-        >
-          {/* Left column: Action selection and config */}
-          <div style={{ width: "100%" }}>
-            <div
-              className="section-box"
-              style={{
-                marginBottom: 32,
-                width: "100%",
-                maxWidth: "none",
-                marginLeft: 0,
-                marginRight: 0,
-              }}
-            >
-              <div className="form-group mb-4">
-                <label htmlFor="action-select">Available Actions:</label>
-                <select
-                  id="action-select"
-                  value={selectedAction}
-                  onChange={handleActionChange}
-                  className="form-control"
-                  disabled={loadingActions}
-                >
-                  <option value="">-- Select an action --</option>
-                  {actions.map((action) => (
-                    <option key={action} value={action}>
-                      {action}
-                    </option>
-                  ))}
-                </select>
+        <div className="flex flex-col gap-8">
+          <div
+            className="agent-form-container"
+            style={{ gap: 40, display: "flex", width: "100%" }}
+          >
+            {/* Left column: Action selection and config */}
+            <div style={{ width: "100%" }}>
+              <div className="section-card">
+                <div className="form-group mb-4">
+                  <label htmlFor="action-select">Available Actions:</label>
+                  <select
+                    id="action-select"
+                    value={selectedAction}
+                    onChange={handleActionChange}
+                    className="form-control mt-4"
+                    disabled={loadingActions}
+                  >
+                    <option value="">-- Select an action --</option>
+                    {actions.map((action) => (
+                      <option key={action} value={action}>
+                        {action}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
           </div>
+
+          {selectedAction && (
+            <div className="section-card">
+              <form onSubmit={handleExecuteAction}>
+                {configFields.length > 0 && (
+                  <>
+                    <div className="font-semibold text-xl mb-2">
+                      Configuration
+                    </div>
+                    <FormFieldDefinition
+                      fields={configFields}
+                      values={JSON.parse(configJson)}
+                      onChange={makeFieldChangeHandler(
+                        configFields,
+                        handleConfigChange
+                      )}
+                      idPrefix="config_"
+                    />
+                  </>
+                )}
+
+                {paramFields.length > 0 && (
+                  <>
+                    <div className="font-semibold text-xl mb-2">Parameters</div>
+                    <FormFieldDefinition
+                      fields={paramFields}
+                      values={JSON.parse(paramsJson)}
+                      onChange={makeFieldChangeHandler(
+                        paramFields,
+                        handleParamsChange
+                      )}
+                      idPrefix="param_"
+                    />
+                  </>
+                )}
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="action-btn"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin"></i> Executing...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-play"></i> Execute Action
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {result && (
+            <div className="section-card">
+              <h3>Action Results</h3>
+
+              <div
+                className="result-container"
+                style={{
+                  maxHeight: "400px",
+                  overflow: "auto",
+                  border: "1px solid rgba(94, 0, 255, 0.3)",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  backgroundColor: "rgba(8, 12, 25, 0.95)",
+                  fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
+                }}
+              >
+                {typeof result === "object" ? (
+                  <pre
+                    className="hljs"
+                    style={{
+                      margin: 0,
+                      backgroundColor: "transparent",
+                      color: "#e6e6e6",
+                      fontSize: "14px",
+                      lineHeight: "1.5",
+                    }}
+                  >
+                    <code>
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: hljs.highlight(
+                            JSON.stringify(result, null, 2),
+                            { language: "json" }
+                          ).value,
+                        }}
+                      ></div>
+                    </code>
+                  </pre>
+                ) : (
+                  <pre
+                    style={{
+                      margin: 0,
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      color: "#e6e6e6",
+                      fontSize: "14px",
+                      lineHeight: "1.5",
+                    }}
+                  >
+                    {result}
+                  </pre>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-        
-        {selectedAction && (
-          <div className="section-box">
-            
-            <form onSubmit={handleExecuteAction}>
-              {configFields.length > 0 && (
-                <>
-                <h2>Configuration</h2>
-                <FormFieldDefinition
-                  fields={configFields}
-                  values={JSON.parse(configJson)}
-                  onChange={makeFieldChangeHandler(configFields, handleConfigChange)}
-                  idPrefix="config_"
-                />
-                </>
-              )}
-
-              {paramFields.length > 0 && (
-                <>
-                <h2>Parameters</h2>
-                <FormFieldDefinition
-                  fields={paramFields}
-                  values={JSON.parse(paramsJson)}
-                  onChange={makeFieldChangeHandler(paramFields, handleParamsChange)}
-                  idPrefix="param_"
-                />
-                </>
-              )}
-              
-              <div className="flex justify-end">
-                <button 
-                  type="submit" 
-                  className="action-btn"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <><i className="fas fa-spinner fa-spin"></i> Executing...</>
-                  ) : (
-                    <><i className="fas fa-play"></i> Execute Action</>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-        
-        {result && (
-          <div className="section-box">
-            <h2>Action Results</h2>
-            
-            <div className="result-container" style={{ 
-              maxHeight: '400px', 
-              overflow: 'auto', 
-              border: '1px solid rgba(94, 0, 255, 0.3)',
-              borderRadius: '8px',
-              padding: '16px',
-              backgroundColor: 'rgba(8, 12, 25, 0.95)',
-              fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace'
-            }}>
-              {typeof result === 'object' ? (
-                <pre className="hljs" style={{ 
-                  margin: 0, 
-                  backgroundColor: 'transparent',
-                  color: '#e6e6e6',
-                  fontSize: '14px',
-                  lineHeight: '1.5'
-                }}>
-                  <code>
-                    <div dangerouslySetInnerHTML={{ __html: hljs.highlight(JSON.stringify(result, null, 2), { language: 'json' }).value }}></div>
-                  </code>
-                </pre>
-              ) : (
-                <pre style={{ 
-                  margin: 0, 
-                  whiteSpace: 'pre-wrap', 
-                  wordBreak: 'break-word',
-                  color: '#e6e6e6',
-                  fontSize: '14px',
-                  lineHeight: '1.5'
-                }}>
-                  {result}
-                </pre>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -352,30 +352,11 @@ function Chat() {
               </div>
 
               <div
-                className="section-box chat-section-box"
-                style={{
-                  width: "100%",
-                  height: "calc(100vh - 300px)",
-                  display: "flex",
-                  flexDirection: "column",
-                  margin: 0,
-                  maxWidth: "none",
-                }}
+                className="section-card chat-section-box"
               >
-                <div
-                  style={{
-                    flex: 1,
-                    overflowY: "auto",
-                  }}
-                >
+                <div className="chat-messages-container">
                   {messages.length === 0 ? (
-                    <div
-                      style={{
-                        color: "var(--text-light)",
-                        textAlign: "center",
-                        marginTop: 48,
-                      }}
-                    >
+                    <div className="chat-empty-state">
                       No messages yet. Say hello!
                     </div>
                   ) : (
@@ -383,26 +364,10 @@ function Chat() {
                       msg.loading ? null : (
                         <div
                           key={idx}
-                          style={{
-                            marginBottom: 12,
-                            display: "flex",
-                            flexDirection:
-                              msg.sender === "user" ? "row-reverse" : "row",
-                          }}
+                          className={`chat-message ${msg.sender}`}
                         >
                           {msg.sender === "user" ? (
-                            <div
-                              style={{
-                                background: "#e0e7ff",
-                                color: "#222",
-                                borderRadius: 18,
-                                padding: "12px 18px",
-                                maxWidth: "70%",
-                                fontSize: "1rem",
-                                boxShadow: "0 2px 6px rgba(0,0,0,0.04)",
-                                alignSelf: "flex-end",
-                              }}
-                            >
+                            <div className="chat-message-bubble user">
                               <div className="markdown-content">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                   {msg.content}
@@ -410,21 +375,8 @@ function Chat() {
                               </div>
                             </div>
                           ) : msg.type === "error" ? (
-                            <div
-                              style={{
-                                color: "#991b1b",
-                                padding: "12px 0",
-                                maxWidth: "70%",
-                                fontSize: "1rem",
-                                alignSelf: "flex-start",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <span
-                                style={{ fontSize: "16px", fontWeight: 400 }}
-                              >
+                            <div className="chat-message-bubble error">
+                              <span className="chat-error-text">
                                 <div className="markdown-content">
                                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                     Error while processing. Please try again.
@@ -433,17 +385,7 @@ function Chat() {
                               </span>
                             </div>
                           ) : (
-                            <div
-                              style={{
-                                background: "transparent",
-                                color: "#222",
-                                padding: "12px 0",
-                                maxWidth: "70%",
-                                fontSize: "1rem",
-                                alignSelf: "flex-start",
-                                position: "relative",
-                              }}
-                            >
+                            <div className="chat-message-bubble agent">
                               <div className="markdown-content">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                   {msg.content}
@@ -457,43 +399,15 @@ function Chat() {
                   )}
 
                   {currentStatus && (
-                    <div
-                      style={{
-                        marginBottom: 12,
-                        display: "flex",
-                        flexDirection: "row",
-                      }}
-                    >
+                    <div className="chat-status-container">
                       <div
-                        style={{
-                          color: currentStatus.isError ? "#991b1b" : "#6b7280",
-                          padding: "12px 0",
-                          maxWidth: "70%",
-                          fontSize: "1rem",
-                          alignSelf: "flex-start",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
+                        className={`chat-status-content ${currentStatus.isError ? 'error' : ''}`}
                       >
                         {currentStatus.isError ? null : (
-                          <div
-                            style={{
-                              width: "16px",
-                              height: "16px",
-                              border: "2px solid #e5e7eb",
-                              borderTop: "2px solid #6b7280",
-                              borderRadius: "50%",
-                              animation: "spin 1s linear infinite",
-                              flexShrink: 0,
-                            }}
-                          />
+                          <div className="chat-status-spinner" />
                         )}
                         <span
-                          style={{
-                            fontSize: "16px",
-                            fontWeight: currentStatus.isError ? 400 : 500,
-                          }}
+                          className={`chat-status-text ${currentStatus.isError ? 'error' : ''}`}
                         >
                           {requirePaymentApproval
                             ? "Waiting for your confirmation"
@@ -565,38 +479,29 @@ function Chat() {
 
                 <form
                   onSubmit={handleSend}
-                  style={{ display: "flex", gap: 12, alignItems: "center" }}
+                  className="chat-form"
                   autoComplete="off"
                 >
-                  <input
-                    type="text"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder={
-                      isConnected ? "Type your message..." : "Connecting..."
-                    }
-                    disabled={sending || !isConnected}
-                    style={{
-                      flex: 1,
-                      padding: "12px 16px",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 8,
-                      fontSize: "1rem",
-                      background: sending || !isConnected ? "#f3f4f6" : "#fff",
-                      color: "#222",
-                      outline: "none",
-                      transition: "border-color 0.15s",
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    className="action-btn"
-                    style={{ minWidth: 120 }}
-                    disabled={sending || !isConnected}
-                  >
-                    <i className="fas fa-paper-plane"></i> Send
-                  </button>
-                  <button
+                  <div className="chat-input-container">
+                    <input
+                      type="text"
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      placeholder={
+                        isConnected ? "Type your message..." : "Connecting..."
+                      }
+                      disabled={sending || !isConnected}
+                      className="chat-input"
+                    />
+                    <button
+                      type="submit"
+                      disabled={sending || !isConnected || !message.trim()}
+                      className="chat-send-button"
+                    >
+                      <i className="fas fa-paper-plane"></i>
+                    </button>
+                  </div>
+                  {/* <button
                     type="button"
                     className="action-btn"
                     style={{
@@ -608,7 +513,7 @@ function Chat() {
                     disabled={sending || messages.length === 0}
                   >
                     <i className="fas fa-trash"></i> Clear Chat
-                  </button>
+                  </button> */}
                 </form>
               </div>
             </div>

@@ -78,29 +78,29 @@ const Usage = () => {
       <div className="main-content-area">
         <div className="header-container">
           <Header
-            title="Usage"
+            title="All Usage"
             description="View detailed usage statistics and costs for your LLM interactions."
           />
         </div>
 
-        <div className="section-box">
+        <div className="section-card">
           <div className="table-container">
             {usage.length === 0 ? (
               <div className="no-usage-message">No usage yet</div>
             ) : (
               <table className="usage-table">
-                <thead>
+                <thead className='text-base'>
                   <tr>
                     {columns.map((column) => (
-                      <th key={column.key}>{column.title}</th>
+                      <th key={column.key} className='text-neutral-900 font-medium text-[15px]'>{column.title}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className='text-sm'>
                   {usage.map((record) => (
                     <tr key={record.id}>
                       {columns.map((column) => (
-                        <td key={`${record.id}-${column.key}`}>
+                        <td key={`${record.id}-${column.key}`} className='min-w-40'>
                           {column.render
                             ? column.render(record[column.dataIndex])
                             : record[column.dataIndex]}

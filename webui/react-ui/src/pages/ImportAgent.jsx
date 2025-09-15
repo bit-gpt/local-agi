@@ -93,7 +93,7 @@ function ImportAgent() {
           <div className="header-right">{backButton}</div>
         </div>
 
-        <div className="section-box" style={{ maxWidth: 720 }}>
+        <div className="section-card" style={{ maxWidth: 720 }}>
           <form
             onSubmit={(e) => {
               e.preventDefault();

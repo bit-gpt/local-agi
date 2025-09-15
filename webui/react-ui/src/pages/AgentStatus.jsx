@@ -409,12 +409,12 @@ function AgentStatus() {
         {statusData && (
           <>
             {/* Current Status Section */}
-            <div className="section-box">
+            <div className="section-card">
               <div 
-                className={`section-header ${!hasStatusHistory ? 'no-history' : ''}`}
+                className={`section-header !mb-2 ${!hasStatusHistory ? 'no-history' : ''}`}
                 onClick={() => hasStatusHistory && setShowStatus(prev => !prev)}
               >
-                <h2>Current Status</h2>
+                <div className='text-lg font-semibold'>Current Status</div>
                 {hasStatusHistory && <i className={`fas fa-chevron-${showStatus ? 'up' : 'down'}`}></i>}
               </div>
              {
@@ -422,7 +422,7 @@ function AgentStatus() {
               ? <p className="section-description">
                 Summary of the agent's thoughts and actions
               </p>
-              : <p className="section-description">
+              : <p className="section-description !mb-2 text-gray-500">
                  No status history available.
               </p>
              }
@@ -446,7 +446,7 @@ function AgentStatus() {
 
             {/* Observable Updates Section */}
             {observableTree.length > 0 && (
-              <div className="section-box">
+              <div className="section-card mt-6">
                 <h2>Observable Updates</h2>
                 <p className="section-description">
                   Drill down into what the agent is doing and thinking
