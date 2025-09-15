@@ -1480,7 +1480,7 @@ func (a *App) GenerateGroupProfiles() func(c *fiber.Ctx) error {
 
 		xlog.Debug("Generating group", "description", request.Descript)
 		client := llm.NewClient(os.Getenv("LOCALAGI_LLM_API_KEY"), os.Getenv("LOCALAGI_LLM_API_URL"), "10m")
-		err := llm.GenerateTypedJSONWithGuidance(c.Context(), client, request.Descript, a.config.LLMModel, userID, uuid.Nil, jsonschema.Definition{
+		err := llm.GenerateTypedJSONWithGuidance(c.Context(), client, request.Descript, os.Getenv("LOCALAGI_MODEL"), userID, uuid.Nil, jsonschema.Definition{
 			Type: jsonschema.Object,
 			Properties: map[string]jsonschema.Definition{
 				"agents": {
@@ -1507,6 +1507,7 @@ func (a *App) GenerateGroupProfiles() func(c *fiber.Ctx) error {
 			},
 		}, &results)
 		if err != nil {
+			xlog.Error("Error generating group profiles", "error", err)
 			return errorJSONMessage(c, err.Error())
 		}
 

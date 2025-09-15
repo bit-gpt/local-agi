@@ -13,6 +13,7 @@ import AdvancedSettingsSection from './agent-form-sections/AdvancedSettingsSecti
 import ExportSection from './agent-form-sections/ExportSection';
 import FiltersSection from './agent-form-sections/FiltersSection';
 import ServerWalletsSection from './agent-form-sections/ServerWalletsSection';
+import useIsMobile from "../hooks/useMobileDetect";
 
 const AgentForm = ({
   isEdit = false,
@@ -32,6 +33,7 @@ const AgentForm = ({
   const [activeSection, setActiveSection] = useState(
     isGroupForm ? "model-section" : "basic-section"
   );
+  const isMobile = useIsMobile();
 
   // Handle input changes
   const handleInputChange = (e) => {
@@ -178,7 +180,7 @@ const AgentForm = ({
               onClick={() => handleSectionChange("basic-section")}
             >
               <i className="fas fa-info-circle"></i>
-              Basic Information
+              {isMobile ? "Basic Info" : "Basic Information"}
             </li>
           )}
           <li
@@ -188,7 +190,7 @@ const AgentForm = ({
             onClick={() => handleSectionChange("model-section")}
           >
             <i className="fas fa-brain"></i>
-            Model Settings
+            {isMobile ? "Model" : "Model Settings"}
           </li>
           <li
             className={`wizard-nav-item ${
@@ -221,7 +223,7 @@ const AgentForm = ({
             onClick={() => handleSectionChange("mcp-section")}
           >
             <i className="fas fa-server"></i>
-            MCP Servers
+            {isMobile ? "MCP" : "MCP Servers"}
           </li>
           <li
             className={`wizard-nav-item ${
@@ -230,7 +232,7 @@ const AgentForm = ({
             onClick={() => handleSectionChange("memory-section")}
           >
             <i className="fas fa-memory"></i>
-            Memory Settings
+            {isMobile ? "Memory" : "Memory Settings"}
           </li>
           <li
             className={`wizard-nav-item ${
@@ -248,7 +250,7 @@ const AgentForm = ({
             onClick={() => handleSectionChange("advanced-section")}
           >
             <i className="fas fa-cogs"></i>
-            Advanced Settings
+            {isMobile ? "Advanced" : "Advanced Settings"}
           </li>
           {isEdit && formData.server_wallets_enabled && (
             <li
@@ -269,7 +271,7 @@ const AgentForm = ({
               onClick={() => handleSectionChange("export-section")}
             >
               <i className="fas fa-file-export"></i>
-              Export Data
+              {isMobile ? "Export" : "Export Data"}
             </li>
           )}
         </ul>
@@ -542,12 +544,12 @@ const AgentForm = ({
             >
               <button
                 type="button"
-                className="action-btn"
+                className="primary-btn"
                 onClick={() => navigate("/agents")}
               >
                 <i className="fas fa-times"></i> Cancel
               </button>
-              <button type="submit" className="action-btn" disabled={loading}>
+              <button type="submit" className="primary-btn" disabled={loading}>
                 <i className="fas fa-save"></i>{" "}
                 {submitButtonText || (isEdit ? "Update Agent" : "Create Agent")}
               </button>

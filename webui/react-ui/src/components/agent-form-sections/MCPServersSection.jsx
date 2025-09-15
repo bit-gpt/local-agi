@@ -45,7 +45,7 @@ const MCPServersSection = ({
               <h4>MCP Server #{index + 1}</h4>
               <button 
                 type="button" 
-                className="action-btn delete-btn"
+                className="remove-btn"
                 onClick={() => handleRemoveMCPServer(index)}
               >
                 <i className="fas fa-times"></i>

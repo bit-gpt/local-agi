@@ -11,18 +11,25 @@ const Header = ({
   title = "Chat with",
   description = "Send messages and interact with your agent in real time.",
   name = "",
+  titleExtra = null,
 }) => {
+  const isName = title === "Agent Settings" || title === "Agent Status" || title === "Chat with";
   return (
     <div className="header-content">
-      <div className="header-title">
-        {title}{" "}
-        {name && (
-          <span className="header-title-highlight">
-            {title === "Agent Settings" ? `- ${name}` : name}
-          </span>
-        )}
-      </div>
-      <div className="header-description">{description}</div>
+      {!isName ? (
+        <div className={`header-title`}>
+          {title}
+          {titleExtra && (
+            <span className="header-title-extra">{titleExtra}</span>
+          )}
+        </div>
+      ) : (
+        <div className={`header-title-name`}>
+          <div className="text-sm text-gray-500 mb-3">{title}</div>
+          <div className="text-2xl sm:text-3xl font-semibold">{name}</div>
+        </div>
+      )}
+      <div className="text-gray-500">{description}</div>
     </div>
   );
 };

@@ -5,6 +5,7 @@ import { agentApi } from "../utils/api";
 import AgentForm from "../components/AgentForm";
 import Header from "../components/Header";
 import { AgentStatus, AgentActionButtons } from "../components/AgentComponents";
+import useIsMobile from "../hooks/useMobileDetect";
 
 function AgentSettings() {
   const { id } = useParams();
@@ -12,7 +13,8 @@ function AgentSettings() {
   const navigate = useNavigate();
   const [metadata, setMetadata] = useState(null);
   const [formData, setFormData] = useState({});
-
+  const isMobile = useIsMobile();
+  
   // Use our custom agent hook
   const { agent, loading, updateAgent, deleteAgent, setAgent } =
     useAgent(id);
@@ -141,7 +143,7 @@ function AgentSettings() {
               setFormData={setFormData}
               onSubmit={updateAgent}
               loading={loading}
-              submitButtonText="Save Changes"
+              submitButtonText={isMobile ? "Save" : "Save Changes"}
               metadata={metadata}
               setAgent={setAgent}
               id={id}

@@ -170,7 +170,7 @@ const ConfigForm = ({
           </h4>
           <button
             type="button"
-            className="action-btn delete-btn"
+            className="remove-btn"
             onClick={() => onRemove(index)}
           >
             <i className="fas fa-times"></i>

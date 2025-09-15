@@ -130,104 +130,65 @@ function AgentsList() {
   }
 
   return (
-    <div className="dashboard-container">
+    <div className="dashboard-container agent-list">
       <div className="main-content-area">
         <div className="header-container">
           <Header
             title="Agents"
             description="Easily manage, access, and interact with all your agents from one place."
+            titleExtra={
+              <div className="stat-card">
+                {agents.length}
+              </div>
+            }
           />
 
-          <Link
-            to="/create"
-            className="action-btn"
-            style={{
-              color: "#1857c7",
-              fontWeight: 600,
-              fontSize: 15,
-              padding: "8px 18px",
-              background: "#eaf1fb",
-              borderRadius: 8,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
+          <Link to="/create" className="action-btn create-agent-btn">
             <i className="fas fa-plus"></i> Create Agent
           </Link>
         </div>
 
-        <div
-          className="dashboard-stats"
-          style={{ display: "flex", gap: 16, marginBottom: 28 }}
-        >
-          <div
-            className="stat-card"
-            style={{
-              background: "#eaf1fb",
-              borderRadius: 12,
-              padding: "18px 24px",
-              minWidth: 120,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-start",
-            }}
-          >
-            <div
-              className="stat-icon"
-              style={{
-                color: "#1857c7",
-                fontWeight: 600,
-                fontSize: 15,
-                marginBottom: 6,
-              }}
-            >
-              <i className="fas fa-robot"></i> Agents
-            </div>
-            <div
-              className="stat-value"
-              style={{ fontSize: 32, fontWeight: 700 }}
-            >
-              {agents.length}
-            </div>
-          </div>
-        </div>
-
         {agents.length > 0 ? (
-          <div className="agents-grid" style={{ marginTop: 22 }}>
+          <div className="agents-grid-list agents-grid">
             {agents.map(({ id, name }) => (
               <div
                 key={id}
                 className="agent-card"
                 data-agent={id}
                 data-active={statuses[id]}
-                style={{ marginBottom: 18 }}
               >
                 <div className="agent-content text-center">
-                  <div className="agent-header">
-                    <h2>{name}</h2>
-                    <span
+                 <div className="agent-header">
+                    <h3>
+                      <i className="fas fa-robot"></i> {name}
+                    </h3>
+                    <div
                       className={`status-badge ${
-                        statuses[id] ? "status-active" : "status-inactive"
+                        statuses[id]
+                          ? "status-active"
+                          : "status-paused"
                       }`}
                     >
                       {statuses[id] ? "Active" : "Paused"}
-                    </span>
+                    </div>
                   </div>
 
                   <div className="agent-actions">
-                    <Link to={`/talk/${id}`} className="action-btn chat-btn">
+                    <Link
+                      to={`/talk/${id}`}
+                      className="agent-action-btn chat-btn"
+                    >
                       <i className="fas fa-comment"></i> Chat
                     </Link>
                     <Link
                       to={`/status/${id}`}
-                      className="action-btn status-btn"
+                      className="agent-action-btn status-btn"
                     >
                       <i className="fas fa-chart-line"></i> Status
                     </Link>
                     <Link
                       to={`/settings/${id}`}
-                      className="action-btn settings-btn"
+                      className="agent-action-btn settings-btn"
                     >
                       <i className="fas fa-cog"></i> Settings
                     </Link>
@@ -235,7 +196,7 @@ function AgentsList() {
 
                   <div className="agent-actions mt-2">
                     <button
-                      className="action-btn toggle-btn"
+                      className="primary-btn"
                       onClick={() => toggleAgentStatus(id, name, statuses[id])}
                     >
                       {statuses[id] ? (
@@ -261,28 +222,10 @@ function AgentsList() {
             ))}
           </div>
         ) : (
-          <div className="no-agents" style={{ marginTop: 32 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
-              No Agents Found
-            </h2>
-            <p style={{ color: "#6b7a90", fontSize: 14, marginBottom: 16 }}>
-              Get started by creating your first agent
-            </p>
-            <Link
-              to="/create"
-              className="action-btn"
-              style={{
-                color: "#1857c7",
-                fontWeight: 600,
-                fontSize: 15,
-                padding: "8px 18px",
-                background: "#eaf1fb",
-                borderRadius: 8,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
+          <div className="no-agents">
+            <h2>No Agents Found</h2>
+            <p>Get started by creating your first agent</p>
+            <Link to="/create" className="action-btn">
               <i className="fas fa-plus"></i> Create Agent
             </Link>
           </div>
