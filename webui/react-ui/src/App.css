@@ -1278,7 +1278,7 @@ a {
   cursor: pointer;
   transition: background-color 0.2s;
   border-bottom: 1px solid #f1f5f9;
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .wizard-dropdown-item:last-child {
@@ -1459,7 +1459,7 @@ a {
   .mb-4 textarea,
   .mb-4 select {
     padding: 8px 12px;
-    font-size: 0.95rem;
+    font-size: 1rem;
   }
 
   .form-actions {
