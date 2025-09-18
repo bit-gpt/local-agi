@@ -44,36 +44,6 @@ export function useAgent(agentId) {
     }
   }, [agentId]);
 
-  // Update agent configuration
-  const updateAgent = useCallback(
-    async (config) => {
-      if (!agentId) return;
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        await agentApi.updateAgentConfig(agentId, config);
-        showToast && showToast("Agent updated successfully!", "success");
-        // Refresh agent data after update
-        await fetchAgent();
-        return true;
-      } catch (err) {
-        if(err?.message){
-          showToast && showToast(err.message.charAt(0).toUpperCase() + err.message.slice(1), "error");
-        } else {
-          showToast && showToast("Failed to create agent", "error");
-        }
-        setError(err.message || "Failed to update agent configuration");
-        console.error("Error updating agent:", err);
-        return false;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [agentId, fetchAgent]
-  );
-
   // Delete agent
   const deleteAgent = useCallback(async () => {
     if (!agentId) return;
@@ -104,7 +74,6 @@ export function useAgent(agentId) {
     loading,
     error,
     fetchAgent,
-    updateAgent,
     deleteAgent,
     setAgent
   };

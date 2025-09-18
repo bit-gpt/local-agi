@@ -58,7 +58,15 @@ const ConfigForm = ({
         if (field.hasOwnProperty('defaultValue') && 
             field.defaultValue !== undefined && 
             !config.hasOwnProperty(field.name)) {
-          config[field.name] = field.defaultValue;
+          
+          // Convert default values to strings only for specific types
+          if (field.type === 'number') {
+            config[field.name] = String(field.defaultValue);
+          } else if (field.type === 'checkbox') {
+            config[field.name] = field.defaultValue ? "true" : "false";
+          } else {
+            config[field.name] = field.defaultValue;
+          }
         }
       });
     }
@@ -78,7 +86,14 @@ const ConfigForm = ({
     if (fieldGroup && fieldGroup.fields) {
       fieldGroup.fields.forEach((field) => {
         if (field.hasOwnProperty('defaultValue') && field.defaultValue !== undefined) {
-          defaultConfig[field.name] = field.defaultValue;
+          // Convert default values to strings only for specific types
+          if (field.type === 'number') {
+            defaultConfig[field.name] = String(field.defaultValue);
+          } else if (field.type === 'checkbox') {
+            defaultConfig[field.name] = field.defaultValue ? "true" : "false";
+          } else {
+            defaultConfig[field.name] = field.defaultValue;
+          }
         }
       });
     }
@@ -110,7 +125,15 @@ const ConfigForm = ({
         if (field.hasOwnProperty('defaultValue') && 
             field.defaultValue !== undefined && 
             !config.hasOwnProperty(field.name)) {
-          config[field.name] = field.defaultValue;
+          
+          // Convert default values to strings only for specific types
+          if (field.type === 'number') {
+            config[field.name] = String(field.defaultValue);
+          } else if (field.type === 'checkbox') {
+            config[field.name] = field.defaultValue ? "true" : "false";
+          } else {
+            config[field.name] = field.defaultValue;
+          }
         }
       });
     }

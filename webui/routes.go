@@ -151,8 +151,12 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 	// webapp.Get("/api/notify/:name", app.RequireUser(), app.Notify(pool))
 	// webapp.Post("/old/chat/:name", app.RequireUser(), app.OldChat(pool))
 
+	webapp.Get("/api/templates", app.RequireUser(), app.GetTemplates())
+	webapp.Get("/api/templates/:templateId/config", app.RequireUser(), app.GetTemplateConfig())
+
 	webapp.Post("/api/agent/create", app.RequireUser(), app.Create())
 	webapp.Delete("/api/agent/:id", app.RequireUser(), app.RequireActiveAgent(), app.Delete())
+
 	webapp.Put("/api/agent/:id/pause", app.RequireUser(), app.RequireActiveAgent(), app.Pause())
 	webapp.Put("/api/agent/:id/start", app.RequireUser(), app.RequireActiveAgent(), app.Start())
 

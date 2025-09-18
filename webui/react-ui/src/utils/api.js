@@ -19,6 +19,23 @@ const handleResponse = async (response) => {
   return response.text();
 };
 
+const handleResponseWithError = async (response) => {
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const error = new Error(errorData.error || `API error: ${response.status}`);
+    error.section = errorData.section; // Preserve the section field
+    throw error;
+  }
+
+  // Check if response is JSON
+  const contentType = response.headers.get("content-type");
+  if (contentType && contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  return response.text();
+};
+
 // Helper function to build a full URL
 const buildUrl = (endpoint) => {
   return `${API_CONFIG.baseUrl}${
@@ -152,7 +169,7 @@ export const agentApi = {
       headers: API_CONFIG.headers,
       body: JSON.stringify(config),
     });
-    return handleResponse(response);
+    return handleResponseWithError(response);
   },
 
   // Update an existing agent's configuration
@@ -165,7 +182,7 @@ export const agentApi = {
         body: JSON.stringify(config),
       }
     );
-    return handleResponse(response);
+    return handleResponseWithError(response);
   },
 
   // Update an agent's pay limits
@@ -261,7 +278,7 @@ export const agentApi = {
       method: "POST",
       body: formData,
     });
-    return handleResponse(response);
+    return handleResponseWithError(response);
   },
 
   // Generate group profiles
@@ -284,7 +301,7 @@ export const agentApi = {
       headers: API_CONFIG.headers,
       body: JSON.stringify(data),
     });
-    return handleResponse(response);
+    return handleResponseWithError(response);
   },
 };
 
@@ -395,6 +412,27 @@ export const usageApi = {
   // Get usage statistics
   getUsage: async () => {
     const response = await fetch(buildUrl(API_CONFIG.endpoints.usage), {
+      headers: API_CONFIG.headers,
+    });
+    return handleResponse(response);
+  },
+};
+
+// Templates-related API calls
+export const templatesApi = {
+  // Get all templates or filter by category
+  getTemplates: async () => {
+    const url = API_CONFIG.endpoints.templates;
+    
+    const response = await fetch(buildUrl(url), {
+      headers: API_CONFIG.headers,
+    });
+    return handleResponse(response);
+  },
+
+  // Get template configuration by ID
+  getTemplateConfig: async (templateId) => {
+    const response = await fetch(buildUrl(API_CONFIG.endpoints.templateConfig(templateId)), {
       headers: API_CONFIG.headers,
     });
     return handleResponse(response);

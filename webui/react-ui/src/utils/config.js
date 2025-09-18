@@ -56,5 +56,9 @@ export const API_CONFIG = {
 
     // Usage endpoint
     usage: "/api/usage",
+
+    // Templates endpoints
+    templates: "/api/templates",
+    templateConfig: (templateId) => `/api/templates/${templateId}/config`,
   },
 };

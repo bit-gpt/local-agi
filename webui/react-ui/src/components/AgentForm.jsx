@@ -28,10 +28,12 @@ const AgentForm = ({
   metadata = null,
   id,
   setAgent,
+  initialActiveSection,
+  onSectionChange,
 }) => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState(
-    isGroupForm ? "model-section" : "basic-section"
+    initialActiveSection || (isGroupForm ? "model-section" : "basic-section")
   );
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -52,6 +54,13 @@ const AgentForm = ({
       };
     }
   }, [isDropdownOpen]);
+
+  // Watch for external activeSection changes
+  useEffect(() => {
+    if (initialActiveSection && initialActiveSection !== activeSection) {
+      setActiveSection(initialActiveSection);
+    }
+  }, [initialActiveSection]);
 
   // Navigation options for easier management
   const getNavigationOptions = () => {
@@ -163,6 +172,9 @@ const AgentForm = ({
   // Handle navigation between sections
   const handleSectionChange = (section) => {
     setActiveSection(section);
+    if (onSectionChange) {
+      onSectionChange(section);
+    }
   };
 
   // Handle connector change (simplified)

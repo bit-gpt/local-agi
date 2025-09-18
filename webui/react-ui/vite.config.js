@@ -30,6 +30,7 @@ export default defineConfig(({ mode }) => {
         // Add other endpoints as needed
         "/settings": backendUrl,
         "/agents": backendUrl,
+        "/templates": backendUrl,
         "/create": backendUrl,
         "/delete": backendUrl,
         "/pause": backendUrl,

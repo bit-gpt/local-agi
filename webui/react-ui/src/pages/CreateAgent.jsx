@@ -1,22 +1,38 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useOutletContext } from "react-router-dom";
-import { agentApi } from "../utils/api";
+import { useNavigate, useOutletContext, useSearchParams } from "react-router-dom";
+import { agentApi, templatesApi } from "../utils/api";
 import AgentForm from "../components/AgentForm";
 import Header from "../components/Header";
 
 function CreateAgent() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const templateId = searchParams.get("template");
+
   const { showToast } = useOutletContext();
   const [loading, setLoading] = useState(false);
   const [metadata, setMetadata] = useState(null);
   const [formData, setFormData] = useState({});
+  const [templateLoading, setTemplateLoading] = useState(false);
+  const [templateError, setTemplateError] = useState(null);
+  const [templateConfig, setTemplateConfig] = useState(null);
+  const [activeSection, setActiveSection] = useState(null);
 
   useEffect(() => {
-    document.title = "Create Agent - LocalAGI";
-    return () => {
-      document.title = "LocalAGI"; // Reset title when component unmounts
-    };
-  }, []);
+    const fetchTemplateConfig = async () => {
+      try {
+        setTemplateLoading(true);
+        const response = await templatesApi.getTemplateConfig(templateId);
+        setTemplateConfig(response.config);
+      } catch(err){
+        setTemplateError(err);
+        setTemplateLoading(false);
+      }
+    }
+    if(templateId) {
+      fetchTemplateConfig();
+    }
+  }, [templateId]);
 
   // Fetch metadata on component mount
   useEffect(() => {
@@ -36,10 +52,10 @@ function CreateAgent() {
     fetchMetadata();
   }, []);
 
-  // Initialize formData with default values when metadata is loaded
+  // Initialize formData with template config or default values when metadata is loaded
   useEffect(() => {
     if (metadata && Object.keys(formData).length === 0) {
-      const defaultFormData = {
+      let initialFormData = {
         // Initialize arrays for complex fields
         connectors: [],
         actions: [],
@@ -47,37 +63,78 @@ function CreateAgent() {
         mcp_servers: [],
       };
 
-      // Process all field sections to extract default values
-      const sections = [
-        'BasicInfoSection',
-        'ModelSettingsSection', 
-        'MemorySettingsSection',
-        'PromptsGoalsSection',
-        'AdvancedSettingsSection'
-      ];
+      // Helper function to get default value for a field from metadata
+      const getDefaultValueFromMetadata = (fieldName) => {
+        const sections = [
+          'BasicInfoSection',
+          'ModelSettingsSection', 
+          'MemorySettingsSection',
+          'PromptsGoalsSection',
+          'AdvancedSettingsSection'
+        ];
 
-      sections.forEach((sectionKey) => {
-        if (metadata[sectionKey] && Array.isArray(metadata[sectionKey])) {
-          metadata[sectionKey].forEach((field) => {
-            if (field.name) {
-              let defaultValue = field.defaultValue;
-              
+        for (const sectionKey of sections) {
+          if (metadata[sectionKey] && Array.isArray(metadata[sectionKey])) {
+            const field = metadata[sectionKey].find(f => f.name === fieldName);
+            if (field) {
               // If field has options array, use the first option's value
               if (field.options && Array.isArray(field.options) && field.options.length > 0) {
-                defaultValue = field.options[0].value;
+                return field.options[0].value;
               } else if (field.hasOwnProperty('defaultValue')) {
-                defaultValue = field.defaultValue;
+                return field.defaultValue;
               }
-              
-              defaultFormData[field.name] = defaultValue;
             }
-          });
+          }
         }
-      });
+        return undefined;
+      };
 
-      setFormData(defaultFormData);
+      // If we have template config, use it to prepopulate the form
+      if (templateConfig) {
+        // Automatically map all fields from template config
+        Object.keys(templateConfig).forEach(key => {
+          if (key === 'actions') {
+            // Special handling for actions array
+            initialFormData[key] = templateConfig[key] ? templateConfig[key].map(action => ({
+              config: action.config || '{}',
+              name: action.name
+            })) : [];
+          } else if (Array.isArray(templateConfig[key])) {
+            initialFormData[key] = templateConfig[key] || [];
+          } else if(key === 'system_prompt' || key === 'name' || key === 'description' || key === 'model') {
+            initialFormData[key] = templateConfig[key] || '';
+          } else {
+            initialFormData[key] = getDefaultValueFromMetadata(key);
+          }
+        });
+      } else {
+        // Use default values from metadata when no template config
+        const sections = [
+          'BasicInfoSection',
+          'ModelSettingsSection', 
+          'MemorySettingsSection',
+          'PromptsGoalsSection',
+          'AdvancedSettingsSection'
+        ];
+
+        sections.forEach((sectionKey) => {
+          if (metadata[sectionKey] && Array.isArray(metadata[sectionKey])) {
+            metadata[sectionKey].forEach((field) => {
+              if (field.name) {
+                const defaultValue = getDefaultValueFromMetadata(field.name);
+                if (defaultValue !== undefined) {
+                  initialFormData[field.name] = defaultValue;
+                }
+              }
+            });
+          }
+        });
+      }
+
+      setFormData(initialFormData);
+      setTemplateLoading(false)
     }
-  }, [metadata, formData]);
+  }, [metadata, templateConfig, formData]);
 
   // Handle form submission
   const handleSubmit = async (data) => {
@@ -91,6 +148,9 @@ function CreateAgent() {
         showToast && showToast(error.message.charAt(0).toUpperCase() + error.message.slice(1), "error");
       } else {
         showToast && showToast("Failed to create agent", "error");
+      }
+      if(error.section) {
+        setActiveSection(error.section);
       }
       console.log("Error creating agent:", error);
     } finally {
@@ -106,6 +166,18 @@ function CreateAgent() {
       <i className="fas fa-arrow-left"></i> Back to Agents
     </button>
   );
+
+  if (templateLoading) {
+    return (
+      <div className="loading-container">
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  if (templateError) {
+    return <div className="error">{templateError}</div>;
+  }
 
   return (
     <div className="dashboard-container">
@@ -125,6 +197,8 @@ function CreateAgent() {
             setFormData={setFormData}
             onSubmit={handleSubmit}
             loading={loading}
+            initialActiveSection={activeSection}
+            onSectionChange={setActiveSection}
           />
         </div>
       </div>
