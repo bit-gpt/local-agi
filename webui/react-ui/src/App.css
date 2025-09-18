@@ -4004,3 +4004,8 @@ a {
 .templates-sidebar {
   width: 380px;
 }
+
+.import-agent-container {
+  max-width: 720px;
+  margin: 0 auto;
+}

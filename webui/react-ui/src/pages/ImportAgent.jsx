@@ -65,8 +65,12 @@ function ImportAgent() {
       showToast("Agent imported successfully", "success");
       navigate("/agents");
     } catch (err) {
+      if(err?.message){
+        showToast && showToast(err.message.charAt(0).toUpperCase() + err.message.slice(1), "error");
+      } else {
+        showToast("Failed to import agent", "error");
+      }
       console.error("Error importing agent:", err);
-      showToast("Failed to import agent", "error");
     } finally {
       setLoading(false);
     }
@@ -93,7 +97,7 @@ function ImportAgent() {
           <div className="header-right">{backButton}</div>
         </div>
 
-        <div className="section-card" style={{ maxWidth: 720 }}>
+        <div className="section-card import-agent-container">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -212,7 +216,7 @@ function ImportAgent() {
             >
               <button
                 type="submit"
-                className="action-btn"
+                className="primary-btn"
                 disabled={loading || !file}
               >
                 {loading ? (
