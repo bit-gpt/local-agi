@@ -992,6 +992,11 @@ a {
 
 .agent-list .no-agents {
   margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: calc(100vh - 25rem);
 }
 
 .agent-list .no-agents h2 {
@@ -1004,6 +1009,10 @@ a {
   color: #6b7a90;
   font-size: 14px;
   margin-bottom: 16px;
+}
+
+.agent-list .no-agents .create-agent-btn {
+  width: max-content;
 }
 
 .group-section-container {
@@ -1086,6 +1095,9 @@ a {
 }
 
 @media (max-width: 768px) {
+  .action-btn.create-agent-btn.hide-mobile-btn {
+   display: none;
+  }
   .chat-message .chat-message-bubble.agent {
     max-width: none;
   }

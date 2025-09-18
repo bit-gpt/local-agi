@@ -143,7 +143,7 @@ function AgentsList() {
             }
           />
 
-          <Link to="/templates" className="action-btn create-agent-btn">
+          <Link to="/templates" className={`action-btn create-agent-btn ${agents.length > 0 ? "" : "hide-mobile-btn"}`}>
             <i className="fas fa-plus"></i> Create Agent
           </Link>
         </div>
@@ -225,7 +225,7 @@ function AgentsList() {
           <div className="no-agents">
             <h2>No Agents Found</h2>
             <p>Get started by creating your first agent</p>
-            <Link to="/templates" className="action-btn">
+            <Link to="/templates" className="action-btn create-agent-btn">
               <i className="fas fa-plus"></i> Create Agent
             </Link>
           </div>
