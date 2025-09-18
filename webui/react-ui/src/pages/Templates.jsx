@@ -166,11 +166,7 @@ const Templates = () => {
                     }`}
                     onClick={() => handleCategoryChange(option.id)}
                   >
-                    <div className="nav-circle">
-                      <div className="circle-fill"></div>
-                    </div>
                     <span>{option.label}</span>
-                    <span className="category-count">({option.count})</span>
                   </div>
                 ))}
               </div>
