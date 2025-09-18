@@ -177,11 +177,12 @@ func (h *H402Client) SendH402RequestWithPaymentInfo(ctx context.Context, method,
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusPaymentRequired {
 		return &H402ResponseWithPaymentInfo{Response: resp, PaymentInfo: nil, PayLimitExceeded: nil, InfoError: nil}, nil
 	}
+
+	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -318,11 +319,12 @@ func (h *H402Client) SendH402RequestWithPaymentInfoAndWalletConnection(ctx conte
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusPaymentRequired {
 		return &H402ResponseWithPaymentInfo{Response: resp, PaymentInfo: nil, PayLimitExceeded: nil, InfoError: nil}, nil
 	}
+
+	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

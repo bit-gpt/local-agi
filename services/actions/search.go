@@ -111,7 +111,7 @@ func SearchConfigMeta() []config.Field {
 			Name:         "results",
 			Label:        "Number of Results",
 			Type:         config.FieldTypeNumber,
-			DefaultValue: 1,
+			DefaultValue: 10,
 			Min:          1,
 			Max:          100,
 			Step:         1,

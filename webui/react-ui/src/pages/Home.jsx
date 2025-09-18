@@ -29,7 +29,6 @@ function Home() {
     };
   }, []);
 
-
   useLogout({
     onSuccess: () => {
       setStats({
@@ -38,8 +37,8 @@ function Home() {
         actions: 32,
         connectors: 9,
         status: {},
-      })
-    }
+      });
+    },
   });
 
   // Fetch dashboard data
@@ -146,7 +145,12 @@ function Home() {
 
         {stats.agents.length > 0 ? (
           <div className="agents-section">
-            <h2>Your Agents</h2>
+            <div className="agents-section-header">
+              <h3>Your Agents</h3>
+              <Link to="/templates" className="action-btn create-agent-btn">
+                <i className="fas fa-plus"></i> Create Agent
+              </Link>
+            </div>
             <div className="agents-grid">
               {stats.agents.map((agent) => (
                 <div key={agent.id} className="agent-card">
@@ -199,7 +203,7 @@ function Home() {
             </div>
             <div className="features-grid">
               <FeatureCard
-                to="/create"
+                to="/templates"
                 imageSrc="/app/features/duplicate-plus.svg"
                 imageAlt="Duplicate Plus"
                 title="Create Agent"

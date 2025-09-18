@@ -13,11 +13,12 @@ function AgentSettings() {
   const navigate = useNavigate();
   const [metadata, setMetadata] = useState(null);
   const [formData, setFormData] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [activeSection, setActiveSection] = useState(null);
   const isMobile = useIsMobile();
-  
+
   // Use our custom agent hook
-  const { agent, loading, updateAgent, deleteAgent, setAgent } =
-    useAgent(id);
+  const { agent, deleteAgent, setAgent, fetchAgent } = useAgent(id);
 
   // Update document title
   useEffect(() => {
@@ -69,9 +70,8 @@ function AgentSettings() {
 
         // Show success toast
         const action = isActive ? "paused" : "started";
-        
-        showToast(`Agent "${name}" ${action} successfully`, "success");
 
+        showToast(`Agent "${name}" ${action} successfully`, "success");
       } else {
         const errorData = await response.json().catch(() => null);
         throw new Error(
@@ -89,7 +89,10 @@ function AgentSettings() {
     try {
       const success = await toggleAgentStatus(id, agent.name, isActive);
       if (success) {
-        showToast(`Agent "${agent.name}" ${isActive ? "resumed" : "paused"}`, "success");
+        showToast(
+          `Agent "${agent.name}" ${isActive ? "resumed" : "paused"}`,
+          "success"
+        );
       }
     } catch (err) {
       console.error("Error toggling agent status:", err);
@@ -106,6 +109,33 @@ function AgentSettings() {
     } catch (err) {
       console.error("Error deleting agent:", err);
       showToast("Failed to delete agent", "error");
+    }
+  };
+
+  const updateAgent = async (config) => {
+    setLoading(true);
+
+    try {
+      await agentApi.updateAgentConfig(id, config);
+      showToast && showToast("Agent updated successfully!", "success");
+      // Refresh agent data after update
+      await fetchAgent();
+    } catch (err) {
+      if (err?.message) {
+        showToast &&
+          showToast(
+            err.message.charAt(0).toUpperCase() + err.message.slice(1),
+            "error"
+          );
+      } else {
+        showToast && showToast("Failed to create agent", "error");
+      }
+      if(error.section) {
+        setActiveSection(error.section);
+      }
+      console.error("Error updating agent:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -147,6 +177,8 @@ function AgentSettings() {
               metadata={metadata}
               setAgent={setAgent}
               id={id}
+              initialActiveSection={activeSection}
+              onSectionChange={setActiveSection}
             />
           ) : (
             <div className="centered-loading">

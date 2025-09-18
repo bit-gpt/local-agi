@@ -15,7 +15,8 @@ function GroupCreate() {
   const [formData, setFormData] = useState({
     profiles: [],
   });
-
+  const [activeSection, setActiveSection] = useState(null);
+  
   // Update document title
   useEffect(() => {
     document.title = "Create Agent Group - LocalAGI";
@@ -226,14 +227,17 @@ function GroupCreate() {
       );
       navigate("/agents");
     } catch (err) {
-      if (error?.message) {
+      if (err?.message) {
         showToast &&
           showToast(
-            error.message.charAt(0).toUpperCase() + error.message.slice(1),
+            err.message.charAt(0).toUpperCase() + err.message.slice(1),
             "error"
           );
       } else {
         showToast && showToast("Failed to create agent", "error");
+      }
+      if(err.section) {
+        setActiveSection(err.section);
       }
       console.error("Error creating group:", err);
     } finally {
@@ -481,6 +485,8 @@ function GroupCreate() {
                         isGroupForm={true}
                         metadata={metadata}
                         noFormWrapper={true}
+                        initialActiveSection={activeSection}
+                        onSectionChange={setActiveSection}
                       />
 
                       <div className="button-container-between">

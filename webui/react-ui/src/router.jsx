@@ -11,6 +11,7 @@ import AgentStatus from "./pages/AgentStatus";
 import ImportAgent from "./pages/ImportAgent";
 import Usage from "./pages/Usage";
 import ProtectedRoute from "./components/ProtectedRoute";
+import Templates from "./pages/Templates";
 
 const BASE_URL = import.meta.env.BASE_URL || "/app";
 
@@ -37,6 +38,14 @@ export const router = createBrowserRouter(
           element: (
             <ProtectedRoute>
               <CreateAgent />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "templates",
+          element: (
+            <ProtectedRoute>
+              <Templates />
             </ProtectedRoute>
           ),
         },

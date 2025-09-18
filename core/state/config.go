@@ -71,6 +71,7 @@ type AgentConfig struct {
 	StripThinkingTags     bool   `json:"strip_thinking_tags" form:"strip_thinking_tags"`
 	EnableEvaluation      bool   `json:"enable_evaluation" form:"enable_evaluation"`
 	MaxEvaluationLoops    int    `json:"max_evaluation_loops" form:"max_evaluation_loops"`
+	LastMessageDuration   string `json:"last_message_duration" form:"last_message_duration"`
 }
 
 type AgentConfigMeta struct {
@@ -245,7 +246,7 @@ func NewAgentConfigMeta(
 				Name:         "enable_reasoning",
 				Label:        "Enable Reasoning",
 				Type:         "checkbox",
-				DefaultValue: true,
+				DefaultValue: false,
 				HelpText:     "Enable agent to explain its reasoning process",
 				Tags:         config.Tags{Section: "AdvancedSettings"},
 			},
