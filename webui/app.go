@@ -1799,6 +1799,7 @@ func getOpenRouterModels() []map[string]interface{} {
 		"openai/o3":                            true,
 		"anthropic/claude-3.5-sonnet":          true,
 		"anthropic/claude-3.7-sonnet":          true,
+		"anthropic/claude-sonnet-4":            true,
 		"qwen/qwen-2.5-7b-instruct":            true,
 		"qwen/qwq-32b":                         true,
 		"qwen/qwen-2.5-72b-instruct":           true,

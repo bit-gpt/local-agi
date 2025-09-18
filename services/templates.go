@@ -36,7 +36,7 @@ func GetAllTemplates() []AgentTemplate {
 			Config: state.AgentConfig{
 				Name:         "GitHub Assistant",
 				Description:  "I'm a GitHub assistant that helps you manage repositories, issues, pull requests, and code. I can create, read, update issues and PRs, search repositories, manage content, and automate GitHub workflows.",
-				Model:        "openai/gpt-4o",
+				Model:        "anthropic/claude-sonnet-4",
 				SystemPrompt: "You are a GitHub assistant specialized in repository management, issue tracking, and pull request operations. You help developers automate GitHub workflows, manage code repositories, and maintain project organization. Always be helpful, accurate, and follow GitHub best practices.",
 				Actions: []state.ActionsConfig{
 					{Name: ActionGithubIssueOpener, Config: "{}"},
