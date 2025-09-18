@@ -123,7 +123,6 @@ const Templates = () => {
     return (
       <div className="loading-container">
         <div className="spinner"></div>
-        <p>Loading templates...</p>
       </div>
     );
   }
