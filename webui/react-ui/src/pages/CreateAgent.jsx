@@ -12,6 +12,7 @@ function CreateAgent() {
   const { showToast } = useOutletContext();
   const [loading, setLoading] = useState(false);
   const [metadata, setMetadata] = useState(null);
+  const [metadataLoading, setMetadataLoading] = useState(false);
   const [formData, setFormData] = useState({});
   const [templateLoading, setTemplateLoading] = useState(false);
   const [templateError, setTemplateError] = useState(null);
@@ -37,14 +38,17 @@ function CreateAgent() {
   // Fetch metadata on component mount
   useEffect(() => {
     const fetchMetadata = async () => {
+      setMetadataLoading(true)
       try {
         // Fetch metadata from the dedicated endpoint
         const response = await agentApi.getAgentConfigMetadata();
         if (response) {
           setMetadata(response);
         }
+        setMetadataLoading(false);
       } catch (error) {
         console.error("Error fetching metadata:", error);
+        setMetadataLoading(false);
         // Continue without metadata, the form will use default fields
       }
     };
@@ -167,7 +171,7 @@ function CreateAgent() {
     </button>
   );
 
-  if (templateLoading) {
+  if (templateLoading || metadataLoading) {
     return (
       <div className="loading-container">
         <div className="spinner"></div>

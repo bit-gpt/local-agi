@@ -341,7 +341,6 @@ function Chat() {
   }
 
   return (
-    <WagmiProvider config={config}>
       <EvmWalletProvider>
         <SelectedWalletAccountContextProvider>
           <div className="dashboard-container">
@@ -531,7 +530,6 @@ function Chat() {
           </div>
         </SelectedWalletAccountContextProvider>
       </EvmWalletProvider>
-    </WagmiProvider>
   );
 }
 
