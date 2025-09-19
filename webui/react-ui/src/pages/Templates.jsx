@@ -1,15 +1,22 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { templatesApi } from "../utils/api";
 import useIsMobile from "../hooks/useMobileDetect";
 import { toDisplayFormat } from "../utils/helpers";
 import Header from "../components/Header";
 
+const scratchTemplate = {
+  id: "scratch",
+  name: "Start from Scratch",
+  description: "Create a custom agent with your own configuration",
+  category: "scratch",
+  icon: "scratch",
+};
+
 const Templates = () => {
   const navigate = useNavigate();
   const { showToast } = useOutletContext();
   const [templates, setTemplates] = useState([]);
-  const [filteredTemplates, setFilteredTemplates] = useState([]);
   const [categories, setCategories] = useState([]);
   const [activeCategory, setActiveCategory] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -46,7 +53,6 @@ const Templates = () => {
         const response = await templatesApi.getTemplates();
         if (response.success) {
           setTemplates(response.templates);
-          setFilteredTemplates(response.templates);
 
           const uniqueCategories = [
             ...new Set(response.templates.map((t) => t.category)),
@@ -64,30 +70,9 @@ const Templates = () => {
     };
 
     fetchTemplates();
-  }, [showToast]);
+  }, []); 
 
-  const createScratchTemplate = () => ({
-    id: "scratch",
-    name: "Start from Scratch",
-    description: "Create a custom agent with your own configuration",
-    category: "scratch",
-    icon: "scratch",
-  });
-
-  useEffect(() => {
-    const scratchTemplate = createScratchTemplate();
-
-    if (activeCategory === "all") {
-      setFilteredTemplates([scratchTemplate, ...templates]);
-    } else {
-      const categoryTemplates = templates.filter(
-        (template) => template.category === activeCategory
-      );
-      setFilteredTemplates([scratchTemplate, ...categoryTemplates]);
-    }
-  }, [activeCategory, templates]);
-
-  const getNavigationOptions = () => {
+  const navigationOptions = useMemo(() => {
     const options = [
       {
         id: "all",
@@ -104,20 +89,53 @@ const Templates = () => {
     });
 
     return options;
-  };
+  }, [categories]);
 
-  const handleCategoryChange = (categoryId) => {
+  const handleCategoryChange = useCallback((categoryId) => {
     setActiveCategory(categoryId);
     setIsDropdownOpen(false);
-  };
+  }, []);
 
-  const handleTemplateSelect = async (template) => {
+  const handleTemplateSelect = useCallback(async (template) => {
     if(template.id === "scratch") {
       navigate("/create");
       return;
     }
     navigate(`/create?template=${template.id}`);
-  };
+  }, [navigate]);
+
+  const filteredTemplates = useMemo(() => {
+    if (activeCategory === "all") {
+      return [scratchTemplate, ...templates];
+    } else {
+      const categoryTemplates = templates.filter(
+        (template) => template.category === activeCategory
+      );
+      return [scratchTemplate, ...categoryTemplates];
+    }
+  }, [activeCategory, templates]);
+
+  const currentCategory = useMemo(() => 
+    navigationOptions.find((option) => option.id === activeCategory),
+    [navigationOptions, activeCategory]
+  );
+
+  const handleToggleDropdown = useCallback(() => {
+    setIsDropdownOpen(prev => !prev);
+  }, []);
+
+  const handleCategoryClick = useCallback((event) => {
+    const categoryId = event.currentTarget.dataset.categoryId;
+    handleCategoryChange(categoryId);
+  }, [handleCategoryChange]);
+
+  const handleTemplateClick = useCallback((event) => {
+    const templateId = event.currentTarget.dataset.templateId;
+    const template = filteredTemplates.find(t => t.id === templateId);
+    if (template) {
+      handleTemplateSelect(template);
+    }
+  }, [handleTemplateSelect, filteredTemplates]);
 
   if (loading) {
     return (
@@ -126,11 +144,6 @@ const Templates = () => {
       </div>
     );
   }
-
-  const navigationOptions = getNavigationOptions();
-  const currentCategory = navigationOptions.find(
-    (option) => option.id === activeCategory
-  );
 
   return (
     <div className="dashboard-container">
@@ -145,7 +158,7 @@ const Templates = () => {
           <div className="wizard-mobile-dropdown" ref={dropdownRef}>
             <div
               className="wizard-dropdown-trigger"
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              onClick={handleToggleDropdown}
             >
               <div className="wizard-dropdown-trigger-content">
                 <span>{currentCategory?.label || "All Templates"}</span>
@@ -164,7 +177,8 @@ const Templates = () => {
                     className={`wizard-dropdown-item ${
                       activeCategory === option.id ? "active" : ""
                     }`}
-                    onClick={() => handleCategoryChange(option.id)}
+                    data-category-id={option.id}
+                    onClick={handleCategoryClick}
                   >
                     <span>{option.label}</span>
                   </div>
@@ -188,7 +202,8 @@ const Templates = () => {
                         className={`wizard-nav-item ${
                           activeCategory === option.id ? "active" : ""
                         }`}
-                        onClick={() => handleCategoryChange(option.id)}
+                        data-category-id={option.id}
+                        onClick={handleCategoryClick}
                       >
                         <div className="nav-circle">
                           <div className="circle-fill"></div>
@@ -212,10 +227,11 @@ const Templates = () => {
                     <div
                       key={template.id}
                       className="template-card"
-                      onClick={() => handleTemplateSelect(template)}
+                      data-template-id={template.id}
+                      onClick={handleTemplateClick}
                     >
                       <div className="template-icon">
-                        <img src={`/app/templates/${template.icon}.svg`} />
+                        <img src={`/app/templates/${template.icon}.svg`} alt={template.name} />
                       </div>
                       <div className="template-name">{template.name}</div>
                       <p className="template-description">
