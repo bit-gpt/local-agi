@@ -35,7 +35,7 @@ Your task is to:
 5. When users mention temporal references like "today", "this week", "recent", etc., use the current date and time provided above
 
 SPECIAL FORMATTING RULES:
-- For EMAIL actions (send_email): 
+- For EMAIL actions (send_email or gmail-send): 
   * Use PLAIN TEXT formatting ONLY - NO markdown syntax whatsoever
   * Do NOT use **bold**, *italic*, bullet points (-), numbered lists (1.), or any markdown
   * Instead use: CAPITAL LETTERS for emphasis, line breaks for structure, plain text formatting
@@ -72,6 +72,7 @@ func (a *Agent) decision(
 		singleToolGuidance := fmt.Sprintf(`IMPORTANT: When responding to user requests, prefer using a SINGLE tool call that can handle the entire request when possible.
 
 Current Date and Time: %s
+Agent Name: %s
 
 EXECUTION GUIDELINES:
 - Execute user-requested actions DIRECTLY without asking for permission or consent
@@ -79,19 +80,23 @@ EXECUTION GUIDELINES:
 - Do not ask "Do you want me to..." or "Should I..." or "Please confirm..." - just execute the action
 - The user has already given consent by making the request
 
-EMAIL SPECIFIC RULES:
-- For send_email actions: Use PLAIN TEXT only - NO markdown formatting in email content
-- Do NOT use **bold**, *italic*, bullet points (-), numbered lists (1.), or any markdown in emails
-- Use plain text with proper spacing, line breaks, and CAPITAL LETTERS for emphasis if needed
+SPECIAL FORMATTING RULES:
+- For EMAIL actions (send_email or gmail-send): 
+  * Use PLAIN TEXT formatting ONLY - NO markdown syntax whatsoever
+  * Do NOT use **bold**, *italic*, bullet points (-), numbered lists (1.), or any markdown
+  * Instead use: CAPITAL LETTERS for emphasis, line breaks for structure, plain text formatting
+  * Sign emails with the agent's actual name (provided above), not "[Your Name]" or generic placeholders
+  * Example: "Best regards,\n[Agent Name]" (replace [Agent Name] with the actual agent name provided)
+- For all other actions: Use appropriate formatting as needed
 
 Examples:
 - For "weather in Paris and Boston" → use one search like "current weather in Paris and Boston"
 - For "tell me about X and Y" → use one search like "information about X and Y"
-- For "email me the results at user@example.com" → send the email directly using send_email action (plain text only)
+- For "email me the results at user@example.com" → send the email directly using send_email or gmail-send action (plain text only)
 - For multiple related items → combine them into one comprehensive query
 - When users mention temporal references like "today", "this week", "recent", etc., use the current date and time provided above
 
-Choose the most appropriate single tool call to fulfill the user's complete request and execute it immediately.`, time.Now().Format(time.RFC3339))
+Choose the most appropriate single tool call to fulfill the user's complete request and execute it immediately.`, time.Now().Format(time.RFC3339), a.Character.Name)
 
 		enhancedConversation = append([]openai.ChatCompletionMessage{
 			{

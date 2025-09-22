@@ -1,10 +1,18 @@
-import React from "react";
+import React, { useMemo } from "react";
 import ActionForm from "../ActionForm";
+import PlatformOAuthButtons from "../PlatformOAuthButtons";
+import { PLATFORM_INFO } from "../../utils/platformActions";
+import { useOutletContext } from "react-router-dom";
 
 /**
  * ActionsSection component for the agent form
  */
 const ActionsSection = ({ formData, setFormData, metadata }) => {
+  const { showToast } = useOutletContext();
+
+  // Memoize actions array to prevent unnecessary re-renders
+  const actions = useMemo(() => formData.actions || [], [formData.actions]);
+
   // Handle action change
   const handleActionChange = (index, updatedAction) => {
     const updatedActions = [...(formData.actions || [])];
@@ -34,6 +42,16 @@ const ActionsSection = ({ formData, setFormData, metadata }) => {
     });
   };
 
+  const handleOAuthChange = (platform, status) => {
+    console.log(`OAuth status changed for ${platform}:`, status);
+    if(status.connected){
+      showToast(`${PLATFORM_INFO[platform]?.name} connected successfully`, "success");
+    } else {
+      showToast(`${PLATFORM_INFO[platform]?.name} disconnected successfully`, "success");
+    }
+    // Optionally trigger a refresh or update UI state
+  };
+
   return (
     <div className="actions-section">
       <h3 className="section-title">Actions</h3>
@@ -41,13 +59,19 @@ const ActionsSection = ({ formData, setFormData, metadata }) => {
         Configure actions that the agent can perform.
       </p>
 
+      <PlatformOAuthButtons
+        actions={actions}
+        onOAuthChange={handleOAuthChange}
+      />
+
       <ActionForm
-        actions={formData.actions || []}
+        actions={actions}
         onChange={handleActionChange}
         onRemove={handleActionRemove}
         onAdd={handleAddAction}
         fieldGroups={metadata?.actions || []}
       />
+
     </div>
   );
 };

@@ -51,6 +51,7 @@ const (
 	ActionSetReminder                    = "set_reminder"
 	ActionListReminders                  = "list_reminders"
 	ActionRemoveReminder                 = "remove_reminder"
+	ActionGmailSend                      = "gmail-send"
 )
 
 var AvailableActions = []string{
@@ -87,6 +88,7 @@ var AvailableActions = []string{
 	ActionSetReminder,
 	ActionListReminders,
 	ActionRemoveReminder,
+	ActionGmailSend,
 }
 
 const (
@@ -257,6 +259,8 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewSendCryptoAction(wallets)
 	case ActionServerWalletWaitForTransactionConfirmation:
 		a = actions.NewWaitForTransactionConfirmationAction(wallets)
+	case ActionGmailSend:
+		a = actions.NewGmailSend(config)
 	default:
 		xlog.Error("Action not found", "name", name)
 		return nil, fmt.Errorf("Action not found")
@@ -435,6 +439,11 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "remove_reminder",
 			Label:  "Remove Reminder",
 			Fields: []config.Field{},
+		},
+		{
+			Name:   "gmail-send",
+			Label:  "Gmail Send Email",
+			Fields: actions.GmailSendConfigMeta(),
 		},
 	}
 }

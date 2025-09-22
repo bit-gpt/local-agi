@@ -8,6 +8,7 @@ import ConfigForm from './ConfigForm';
 const ActionForm = ({ actions = [], onChange, onRemove, onAdd, fieldGroups = [] }) => {
   const handleActionChange = (index, updatedAction) => {
     onChange(index, updatedAction);
+    console.log(index, updatedAction)
   };
   
   return (

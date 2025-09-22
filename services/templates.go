@@ -66,18 +66,19 @@ func GetAllTemplates() []AgentTemplate {
 		{
 			ID:          "search-researcher",
 			Name:        "Search & Research",
-			Description: "Searches web, scrapes sites, and gathers information",
+			Description: "Searches web, scrapes sites, gathers information, and sends emails",
 			Category:    "research",
 			Icon:        "duckduckgo",
 			Config: state.AgentConfig{
 				Name:         "Search & Research",
-				Description:  "I'm a research specialist that helps you find and analyze information from various sources. I can search the web, scrape websites, browse content, and compile comprehensive research reports.",
+				Description:  "I'm a research specialist that helps you find and analyze information from various sources. I can search the web, scrape websites, browse content, compile comprehensive research reports, and send emails.",
 				Model:        "openai/gpt-4o",
-				SystemPrompt: "You are a research assistant. Your job is to search, gather, and analyze information from reliable sources. Verify facts across multiple references and provide clear, accurate, and well-structured summaries.",
+				SystemPrompt: "You are a research assistant. Your job is to search, gather, and analyze information from reliable sources. Verify facts across multiple references and provide clear, accurate, well-structured summaries, and send emails.",
 				Actions: []state.ActionsConfig{
 					{Name: ActionSearch, Config: "{}"},
 					{Name: ActionBrowse, Config: "{}"},
 					{Name: ActionScraper, Config: "{}"},
+					{Name: ActionGmailSend, Config: "{}"},
 				},
 			},
 		},
@@ -89,11 +90,11 @@ func GetAllTemplates() []AgentTemplate {
 			Icon:        "envelope",
 			Config: state.AgentConfig{
 				Name:         "Email Sender",
-				Description:  "I'm your email sender assistant thatcan help you send emails on your behalf.",
+				Description:  "I'm your email sender assistant that can help you send emails on your behalf.",
 				Model:        "openai/gpt-4o",
-				SystemPrompt: "You are a email sender assistant that helps you send emails on your behalve.",
+				SystemPrompt: "You are a email sender assistant that helps you send emails on your behalf.",
 				Actions: []state.ActionsConfig{
-					{Name: ActionSendMail, Config: "{}"},
+					{Name: ActionGmailSend, Config: "{}"},
 				},
 			},
 		},

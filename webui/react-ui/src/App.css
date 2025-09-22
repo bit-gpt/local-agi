@@ -2798,6 +2798,15 @@ a {
   animation: spin 1s linear infinite;
 }
 
+.spinner-primary-sm {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(30, 84, 191, 0.2);
+  border-top: 2px solid var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
 .loading-text {
   color: var(--text-light);
   font-size: 0.875rem;
@@ -4020,4 +4029,131 @@ a {
 .import-agent-container {
   max-width: 720px;
   margin: 0 auto;
+}
+
+.platform-oauth-section {
+  margin: 20px 0;
+}
+
+.platform-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.platform-card {
+  background: var(--primary-light);
+  border-radius: 12px;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 3.5rem;
+}
+
+.platform-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.platform-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.platform-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.platform-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.platform-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.connected-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-indicator.connected {
+  background: #10b981;
+}
+
+.status-text {
+  font-size: 14px;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.connect-btn {
+  padding: 0.6rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  text-align: center;
+  white-space: nowrap;
+  width: 100%;
+  background-color: var(--primary);
+  color: white;
+  border: 1px solid transparent;
+  transition: background-color 0.2s ease;
+  width: max-content;
+}
+
+.connect-btn:hover:not(:disabled) {
+  cursor: pointer;
+  background-color: var(--primary-dark);
+}
+
+.connect-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+
+
+.disconnect-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  padding: 0.6rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.disconnect-btn-outline:hover:not(:disabled) {
+  background: #e9eef5;
 }

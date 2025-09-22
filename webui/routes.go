@@ -162,6 +162,12 @@ func (app *App) registerRoutes(webapp *fiber.App) {
 
 	webapp.Post("/api/chat/:id", app.RequireUser(), app.RequireActiveAgent(), app.RequireActiveStatusAgent(), app.Chat())
 
+	// OAuth routes
+	webapp.Get("/api/oauth/:platform/auth", app.RequireUser(), app.InitiateOAuth())
+	webapp.Get("/api/oauth/:platform/callback", app.HandleOAuthCallback())
+	webapp.Get("/api/oauth/:platform/status", app.RequireUser(), app.GetOAuthStatus())
+	webapp.Delete("/api/oauth/:platform/disconnect", app.RequireUser(), app.DisconnectOAuth())
+
 	// conversationTracker := conversations.NewConversationTracker[string](app.config.ConversationStoreDuration)
 
 	// webapp.Post("/v1/responses", app.Responses(pool, conversationTracker))
