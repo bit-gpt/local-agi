@@ -114,8 +114,7 @@ function Chat() {
           if (actionName.includes("search")) return "Searching the web";
           if (actionName.includes("browse")) return "Browsing the web page";
           if (actionName.includes("github")) return "Checking GitHub";
-          if (actionName.includes("email") || actionName.includes("mail"))
-            return "Sending email";
+          if (actionName.includes("send_email"))return "Sending email";
           if (actionName.includes("shell")) return "Running command";
           if (actionName.includes("estimate_transaction_fee"))
             return "Estimating transaction fee";
@@ -128,6 +127,10 @@ function Chat() {
           if (actionName.includes("send_crypto")) return "Sending crypto";
           if (actionName.includes("wait_for_transaction_confirmation"))
             return "Waiting for transaction confirmation";
+          if (actionName.includes("generate_image")) return "Generating image";
+          if (actionName.includes("gmail-send-email")) return "Sending email";
+          if (actionName.includes("gmail-create-draft-email")) return "Creating draft email";
+          if (actionName.includes("gmail-send-draft-email")) return "Sending draft email";
           return `Running ${actionName}`;
         }
         return "Taking action";

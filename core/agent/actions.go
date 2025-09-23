@@ -35,7 +35,7 @@ Your task is to:
 5. When users mention temporal references like "today", "this week", "recent", etc., use the current date and time provided above
 
 SPECIAL FORMATTING RULES:
-- For EMAIL actions (send_email or gmail-send): 
+- For EMAIL actions (send_email or gmail-send-email): 
   * Use PLAIN TEXT formatting ONLY - NO markdown syntax whatsoever
   * Do NOT use **bold**, *italic*, bullet points (-), numbered lists (1.), or any markdown
   * Instead use: CAPITAL LETTERS for emphasis, line breaks for structure, plain text formatting
@@ -81,7 +81,7 @@ EXECUTION GUIDELINES:
 - The user has already given consent by making the request
 
 SPECIAL FORMATTING RULES:
-- For EMAIL actions (send_email or gmail-send): 
+- For EMAIL actions (send_email or gmail-send-email): 
   * Use PLAIN TEXT formatting ONLY - NO markdown syntax whatsoever
   * Do NOT use **bold**, *italic*, bullet points (-), numbered lists (1.), or any markdown
   * Instead use: CAPITAL LETTERS for emphasis, line breaks for structure, plain text formatting
@@ -92,7 +92,7 @@ SPECIAL FORMATTING RULES:
 Examples:
 - For "weather in Paris and Boston" → use one search like "current weather in Paris and Boston"
 - For "tell me about X and Y" → use one search like "information about X and Y"
-- For "email me the results at user@example.com" → send the email directly using send_email or gmail-send action (plain text only)
+- For "email me the results at user@example.com" → send the email directly using send_email or gmail-send-email action (plain text only)
 - For multiple related items → combine them into one comprehensive query
 - When users mention temporal references like "today", "this week", "recent", etc., use the current date and time provided above
 

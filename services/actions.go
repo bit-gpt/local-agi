@@ -51,7 +51,9 @@ const (
 	ActionSetReminder                    = "set_reminder"
 	ActionListReminders                  = "list_reminders"
 	ActionRemoveReminder                 = "remove_reminder"
-	ActionGmailSend                      = "gmail-send"
+	ActionGmailSendEmail                 = "gmail-send-email"
+	ActionGmailCreateDraftEmail          = "gmail-create-draft-email"
+	ActionGmailSendDraftEmail            = "gmail-send-draft-email"
 )
 
 var AvailableActions = []string{
@@ -88,7 +90,9 @@ var AvailableActions = []string{
 	ActionSetReminder,
 	ActionListReminders,
 	ActionRemoveReminder,
-	ActionGmailSend,
+	ActionGmailSendEmail,
+	ActionGmailCreateDraftEmail,
+	ActionGmailSendDraftEmail,
 }
 
 const (
@@ -259,8 +263,12 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewSendCryptoAction(wallets)
 	case ActionServerWalletWaitForTransactionConfirmation:
 		a = actions.NewWaitForTransactionConfirmationAction(wallets)
-	case ActionGmailSend:
-		a = actions.NewGmailSend(config)
+	case ActionGmailSendEmail:
+		a = actions.NewGmailSendEmail(config)
+	case ActionGmailCreateDraftEmail:
+		a = actions.NewGmailCreateDraftEmail(config)
+	case ActionGmailSendDraftEmail:
+		a = actions.NewGmailSendDraftEmail(config)
 	default:
 		xlog.Error("Action not found", "name", name)
 		return nil, fmt.Errorf("Action not found")
@@ -441,9 +449,19 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Fields: []config.Field{},
 		},
 		{
-			Name:   "gmail-send",
+			Name:   "gmail-send-email",
 			Label:  "Gmail Send Email",
-			Fields: actions.GmailSendConfigMeta(),
+			Fields: actions.GmailSendEmailConfigMeta(),
+		},
+		{
+			Name:   "gmail-create-draft-email",
+			Label:  "Gmail Create Draft Email",
+			Fields: actions.GmailCreateDraftEmailConfigMeta(),
+		},
+		{
+			Name:   "gmail-send-draft-email",
+			Label:  "Gmail Send Draft Email",
+			Fields: actions.GmailSendDraftEmailConfigMeta(),
 		},
 	}
 }
