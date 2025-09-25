@@ -85,18 +85,13 @@ func (a *GmailSendEmailAction) Run(ctx context.Context, sharedState *types.Agent
 		return types.ActionResult{}, fmt.Errorf("failed to create email message: %v", err)
 	}
 
-	_, err = gmailService.Users.Messages.Send("me", message).Do()
+	sentMessage, err := gmailService.Users.Messages.Send("me", message).Do()
 	if err != nil {
 		return types.ActionResult{}, fmt.Errorf("failed to send email: %v", err)
 	}
 
-	attachmentInfo := ""
-	if len(result.Attachments) > 0 {
-		attachmentInfo = fmt.Sprintf(" with %d attachment(s)", len(result.Attachments))
-	}
-
 	return types.ActionResult{
-		Result: fmt.Sprintf("Email sent successfully to %s%s", result.To, attachmentInfo),
+		Result: fmt.Sprintf("Email sent successfully. Message ID: %s", sentMessage.Id),
 	}, nil
 }
 

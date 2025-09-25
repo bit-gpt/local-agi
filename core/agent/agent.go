@@ -1275,20 +1275,63 @@ CRITICAL TABLE FORMATTING RULES:
 8. If data is incomplete, use "N/A" or "–" for missing values
 9. Always prioritize creating actual tables over text descriptions when tabular data exists`
 
+	gmailSearchFormattingRules := `
+
+CRITICAL GMAIL SEARCH RESULT FORMATTING RULES:
+1. When displaying Gmail search results, ALWAYS include ALL details provided in the tool result
+2. This includes: Subject, From, Date, Message ID, and Status (Read/Unread)
+3. Do NOT omit the Message ID - it's crucial for email identification and future reference
+4. Present results in a CLEAN TABLE FORMAT using the following structure:
+   | # | Subject | From | Date | Message ID | Status |
+   |---|---------|------|------|------------|--------|
+   | 1 | [subject] | [sender] | [date] | [message_id] | [read/unread] |
+   | 2 | [subject] | [sender] | [date] | [message_id] | [read/unread] |
+5. Use the exact data provided by the tool - do not summarize or filter out details
+6. If there are many results, show at least the first 10 in the table format
+7. Keep the table clean and readable with proper column alignment`
+
+	gmailFormattingRules := `	
+	CRITICAL GMAIL SEARCH FORMATTING RULES:
+	1. Do NOT omit the Message ID if present - it's crucial for email identification and future reference
+	`
+
 	// Check if we just executed an email action to adjust formatting
 	var forceResponsePrompt string
 	if len(conv) > 0 {
 		// Look for email tool calls in recent conversation
 		hasEmailAction := false
+		hasGmailSearchAction := false
+		hasGmailAction := false
+		hasGmailSendAction := false
 		for i := len(conv) - 1; i >= 0 && i >= len(conv)-3; i-- { // Check last 3 messages
-			if conv[i].Role == "tool" && strings.Contains(conv[i].Name, "send_email") {
-				hasEmailAction = true
-				break
+			if conv[i].Role == "tool" {
+				if strings.Contains(conv[i].Name, "send_email") {
+					hasEmailAction = true
+					break
+				}
+				if strings.Contains(conv[i].Name, "gmail-search-emails") {
+					hasGmailSearchAction = true
+					break
+				}
+				if strings.Contains(conv[i].Name, "gmail-send-email") || strings.Contains(conv[i].Name, "gmail-create-draft-email") {
+					hasGmailSendAction = true
+					break
+				}
+				if strings.Contains(conv[i].Name, "gmail") {
+					hasGmailAction = true
+					break
+				}
 			}
 		}
 
 		if hasEmailAction {
 			forceResponsePrompt = basePrompt + emailFormattingRules
+		} else if hasGmailSearchAction {
+			forceResponsePrompt = basePrompt + gmailSearchFormattingRules
+		} else if hasGmailSendAction {
+			forceResponsePrompt = basePrompt + gmailFormattingRules + emailFormattingRules
+		} else if hasGmailAction {
+			forceResponsePrompt = basePrompt + gmailFormattingRules
 		} else {
 			forceResponsePrompt = basePrompt + markdownFormattingRules
 		}
