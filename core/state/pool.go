@@ -172,6 +172,7 @@ func replaceInvalidChars(s string) string {
 // It also saves the state to the file.
 func (a *AgentPool) CreateAgent(id string, agentConfig *AgentConfig) error {
 	id = replaceInvalidChars(id)
+	name := agentConfig.Name
 	agentConfig.Name = id
 
 	a.Lock()
@@ -185,7 +186,7 @@ func (a *AgentPool) CreateAgent(id string, agentConfig *AgentConfig) error {
 	// Insert into the pool
 	a.pool[id] = *agentConfig
 
-	return a.startAgentWithConfig(id, agentConfig, nil)
+	return a.startAgentWithConfig(id, name, agentConfig, nil)
 }
 
 func (a *AgentPool) List() []string {
@@ -209,7 +210,7 @@ func (a *AgentPool) GetStatusHistory(id string) *Status {
 	return a.agentStatus[id]
 }
 
-func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, obs Observer) error {
+func (a *AgentPool) startAgentWithConfig(id string, name string, config *AgentConfig, obs Observer) error {
 	var manager sse.Manager
 	if m, ok := a.managers[id]; ok {
 		manager = m
@@ -281,6 +282,8 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, obs Obs
 		obs = NewSSEObserverWithIDs(id, uuid.MustParse(a.userId), uuid.MustParse(id), manager)
 	}
 
+	fmt.Println("CHCHCHC", name)
+
 	opts := []Option{
 		WithModel(model),
 		WithContext(ctx),
@@ -291,7 +294,7 @@ func (a *AgentPool) startAgentWithConfig(id string, config *AgentConfig, obs Obs
 		WithJobFilters(filters...),
 		//	WithDynamicPrompts(dynamicPrompts...),
 		WithCharacter(Character{
-			Name: id,
+			Name: name,
 		}),
 		WithActions(
 			actions...,
@@ -501,7 +504,7 @@ func (a *AgentPool) StartAll() error {
 		if a.agents[id] != nil { // Agent already started
 			continue
 		}
-		if err := a.startAgentWithConfig(id, &config, nil); err != nil {
+		if err := a.startAgentWithConfig(id, config.Name, &config, nil); err != nil {
 			xlog.Error("Failed to start agent", "id", id, "error", err)
 		}
 	}
@@ -539,7 +542,7 @@ func (a *AgentPool) Start(id string) error {
 		return nil
 	}
 	if config, ok := a.pool[id]; ok {
-		return a.startAgentWithConfig(id, &config, nil)
+		return a.startAgentWithConfig(id, config.Name, &config, nil)
 	}
 
 	return fmt.Errorf("agent %s not found", id)
@@ -643,6 +646,7 @@ func (a *AgentPool) RemoveAgentOnly(id string) {
 // CreateAgentWithExistingManager creates an agent but reuses the existing SSE manager
 func (a *AgentPool) CreateAgentWithExistingManager(id string, agentConfig *AgentConfig, notStart bool) error {
 	id = replaceInvalidChars(id)
+	name := agentConfig.Name
 	agentConfig.Name = id
 
 	a.Lock()
@@ -681,7 +685,7 @@ func (a *AgentPool) CreateAgentWithExistingManager(id string, agentConfig *Agent
 	}
 
 	// Start agent (this will create a new manager)
-	err := a.startAgentWithConfig(id, agentConfig, obs)
+	err := a.startAgentWithConfig(id, name, agentConfig, obs)
 	if err != nil {
 		if obs != nil && o != nil {
 			o.Completion = &types.Completion{Error: err.Error()}

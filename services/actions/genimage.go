@@ -49,14 +49,14 @@ func (a *GenImageAction) Run(ctx context.Context, sharedState *types.AgentShared
 	}
 
 	switch result.Size {
-	case "256x256":
-		req.Size = openai.CreateImageSize256x256
-	case "512x512":
-		req.Size = openai.CreateImageSize512x512
 	case "1024x1024":
 		req.Size = openai.CreateImageSize1024x1024
+	case "1024x1792":
+		req.Size = openai.CreateImageSize1024x1792
+	case "1792x1024":
+		req.Size = openai.CreateImageSize1792x1024
 	default:
-		req.Size = openai.CreateImageSize256x256
+		req.Size = openai.CreateImageSize1024x1024
 	}
 
 	resp, err := a.client.CreateImage(ctx, req)
@@ -87,7 +87,7 @@ func (a *GenImageAction) Definition() types.ActionDefinition {
 			"size": {
 				Type:        jsonschema.String,
 				Description: "The image prompt to generate the image.",
-				Enum:        []string{"256x256", "512x512", "1024x1024"},
+				Enum:        []string{"1024x1024", "1024x1792", "1792x1024"},
 			},
 		},
 		Required: []string{"prompt"},

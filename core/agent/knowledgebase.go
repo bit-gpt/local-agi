@@ -48,7 +48,7 @@ func (a *Agent) knowledgeBaseLookup(job *types.Job, conv Messages) Messages {
 	if a.options.useMySQLForSummaries && a.options.enableKB {
 		mysqlStorage := NewMySQLStorage(a.options.agentID, a.options.userID)
 		excludeCount := 1
-		if a.options.enableSummaryMemory {
+		if a.options.enableSummaryMemory || a.options.enableLongTermMemory {
 			fmt.Printf("DEBUG: Using search with count-based exclusion (excluding %d most recent messages)\n", excludeCount)
 			results, err = mysqlStorage.Search(userMessage, a.options.kbResults, excludeCount)
 			fmt.Printf("DEBUG: MySQL search results: %d memories found\n", len(results))
@@ -119,7 +119,7 @@ func (a *Agent) processMemoryResults(results []MemoryResult) []MemoryResult {
 	deduplicated := a.deduplicateMemories(results)
 
 	// Step 2: Length limiting for individual memories
-	lengthLimited := a.limitMemoryLength(deduplicated, 500) // Limit each memory to 500 chars
+	lengthLimited := a.limitMemoryLength(deduplicated, 10000) // Limit each memory to 10000 chars
 
 	// Step 3: Sort by time (most recent first)
 	sorted := a.sortMemoriesByTime(lengthLimited)

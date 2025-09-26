@@ -51,6 +51,17 @@ const (
 	ActionSetReminder                    = "set_reminder"
 	ActionListReminders                  = "list_reminders"
 	ActionRemoveReminder                 = "remove_reminder"
+	ActionGmailSendEmail                 = "gmail-send-email"
+	ActionGmailCreateDraftEmail          = "gmail-create-draft-email"
+	ActionGmailSendDraftEmail            = "gmail-send-draft-email"
+	ActionGmailReadEmail                 = "gmail-read-email"
+	ActionGmailSearchEmails              = "gmail-search-emails"
+	ActionGmailArchiveEmail              = "gmail-archive-email"
+	ActionGmailCreateLabel               = "gmail-create-label"
+	ActionGmailUpdateLabel               = "gmail-update-label"
+	ActionGmailListLabels                = "gmail-list-labels"
+	ActionGmailAddLabelToEmail           = "gmail-add-label-to-email"
+	ActionGmailRemoveLabelFromEmail      = "gmail-remove-label-from-email"
 )
 
 var AvailableActions = []string{
@@ -87,6 +98,17 @@ var AvailableActions = []string{
 	ActionSetReminder,
 	ActionListReminders,
 	ActionRemoveReminder,
+	ActionGmailSendEmail,
+	ActionGmailCreateDraftEmail,
+	ActionGmailSendDraftEmail,
+	ActionGmailReadEmail,
+	ActionGmailSearchEmails,
+	ActionGmailArchiveEmail,
+	ActionGmailCreateLabel,
+	ActionGmailUpdateLabel,
+	ActionGmailListLabels,
+	ActionGmailAddLabelToEmail,
+	ActionGmailRemoveLabelFromEmail,
 }
 
 const (
@@ -257,6 +279,28 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewSendCryptoAction(wallets)
 	case ActionServerWalletWaitForTransactionConfirmation:
 		a = actions.NewWaitForTransactionConfirmationAction(wallets)
+	case ActionGmailSendEmail:
+		a = actions.NewGmailSendEmail(config)
+	case ActionGmailCreateDraftEmail:
+		a = actions.NewGmailCreateDraftEmail(config)
+	case ActionGmailSendDraftEmail:
+		a = actions.NewGmailSendDraftEmail(config)
+	case ActionGmailReadEmail:
+		a = actions.NewGmailReadEmail(config)
+	case ActionGmailSearchEmails:
+		a = actions.NewGmailSearchEmails(config)
+	case ActionGmailArchiveEmail:
+		a = actions.NewGmailArchiveEmail(config)
+	case ActionGmailCreateLabel:
+		a = actions.NewGmailCreateLabel(config)
+	case ActionGmailUpdateLabel:
+		a = actions.NewGmailUpdateLabel(config)
+	case ActionGmailListLabels:
+		a = actions.NewGmailListLabels(config)
+	case ActionGmailAddLabelToEmail:
+		a = actions.NewGmailAddLabelToEmail(config)
+	case ActionGmailRemoveLabelFromEmail:
+		a = actions.NewGmailRemoveLabelFromEmail(config)
 	default:
 		xlog.Error("Action not found", "name", name)
 		return nil, fmt.Errorf("Action not found")
@@ -435,6 +479,61 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "remove_reminder",
 			Label:  "Remove Reminder",
 			Fields: []config.Field{},
+		},
+		{
+			Name:   "gmail-send-email",
+			Label:  "Gmail Send Email",
+			Fields: actions.GmailSendEmailConfigMeta(),
+		},
+		{
+			Name:   "gmail-create-draft-email",
+			Label:  "Gmail Create Draft Email",
+			Fields: actions.GmailCreateDraftEmailConfigMeta(),
+		},
+		{
+			Name:   "gmail-send-draft-email",
+			Label:  "Gmail Send Draft Email",
+			Fields: actions.GmailSendDraftEmailConfigMeta(),
+		},
+		{
+			Name:   "gmail-read-email",
+			Label:  "Gmail Read Email",
+			Fields: actions.GmailReadEmailConfigMeta(),
+		},
+		{
+			Name:   "gmail-search-emails",
+			Label:  "Gmail Search Emails",
+			Fields: actions.GmailSearchEmailsConfigMeta(),
+		},
+		{
+			Name:   "gmail-archive-email",
+			Label:  "Gmail Archive Email",
+			Fields: actions.GmailArchiveEmailConfigMeta(),
+		},
+		{
+			Name:   "gmail-create-label",
+			Label:  "Gmail Create Label",
+			Fields: actions.GmailCreateLabelConfigMeta(),
+		},
+		{
+			Name:   "gmail-update-label",
+			Label:  "Gmail Update Label",
+			Fields: actions.GmailUpdateLabelConfigMeta(),
+		},
+		{
+			Name:   "gmail-list-labels",
+			Label:  "Gmail List Labels",
+			Fields: actions.GmailListLabelsConfigMeta(),
+		},
+		{
+			Name:   "gmail-add-label-to-email",
+			Label:  "Gmail Add Label To Email",
+			Fields: actions.GmailAddLabelToEmailConfigMeta(),
+		},
+		{
+			Name:   "gmail-remove-label-from-email",
+			Label:  "Gmail Remove Label From Email",
+			Fields: actions.GmailRemoveLabelFromEmailConfigMeta(),
 		},
 	}
 }

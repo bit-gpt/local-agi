@@ -111,11 +111,10 @@ function Chat() {
       case "action":
         const actionName = observable.creation?.function_definition?.name;
         if (actionName) {
-          if (actionName.includes("search")) return "Searching the web";
+          if (actionName.includes("search_internet")) return "Searching the web";
           if (actionName.includes("browse")) return "Browsing the web page";
           if (actionName.includes("github")) return "Checking GitHub";
-          if (actionName.includes("email") || actionName.includes("mail"))
-            return "Sending email";
+          if (actionName.includes("send_email"))return "Sending email";
           if (actionName.includes("shell")) return "Running command";
           if (actionName.includes("estimate_transaction_fee"))
             return "Estimating transaction fee";
@@ -128,6 +127,18 @@ function Chat() {
           if (actionName.includes("send_crypto")) return "Sending crypto";
           if (actionName.includes("wait_for_transaction_confirmation"))
             return "Waiting for transaction confirmation";
+          if (actionName.includes("generate_image")) return "Generating image";
+          if (actionName.includes("gmail-send-email")) return "Sending email";
+          if (actionName.includes("gmail-create-draft-email")) return "Creating draft email";
+          if (actionName.includes("gmail-send-draft-email")) return "Sending draft email";
+          if (actionName.includes("gmail-read-email")) return "Reading email";
+          if (actionName.includes("gmail-search-emails")) return "Searching emails";
+          if (actionName.includes("gmail-archive-email")) return "Archiving email";
+          if (actionName.includes("gmail-create-label")) return "Creating label";
+          if (actionName.includes("gmail-update-label")) return "Updating label";
+          if (actionName.includes("gmail-list-labels")) return "Listing labels";
+          if (actionName.includes("gmail-add-label-to-email")) return "Adding label to email";
+          if (actionName.includes("gmail-remove-label-from-email")) return "Removing label from email";
           return `Running ${actionName}`;
         }
         return "Taking action";

@@ -130,8 +130,8 @@ function AgentSettings() {
       } else {
         showToast && showToast("Failed to create agent", "error");
       }
-      if(error.section) {
-        setActiveSection(error.section);
+      if(err.section) {
+        setActiveSection(err.section);
       }
       console.error("Error updating agent:", err);
     } finally {

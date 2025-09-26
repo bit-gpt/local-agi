@@ -438,3 +438,31 @@ export const templatesApi = {
     return handleResponse(response);
   },
 };
+
+// OAuth-related API calls
+export const oauthApi = {
+  // Get OAuth status for a platform
+  getPlatformStatus: async (platform) => {
+    const response = await fetch(buildUrl(`/api/oauth/${platform}/status`), {
+      headers: API_CONFIG.headers,
+    });
+    return handleResponse(response);
+  },
+
+  // Initiate OAuth flow for a platform
+  initiatePlatformAuth: async (platform) => {
+    const response = await fetch(buildUrl(`/api/oauth/${platform}/auth`), {
+      headers: API_CONFIG.headers,
+    });
+    return handleResponse(response);
+  },
+
+  // Disconnect OAuth for a platform
+  disconnectPlatform: async (platform) => {
+    const response = await fetch(buildUrl(`/api/oauth/${platform}/disconnect`), {
+      method: 'DELETE',
+      headers: API_CONFIG.headers,
+    });
+    return handleResponse(response);
+  },
+};

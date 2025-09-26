@@ -47,7 +47,7 @@ func ConnectDB() {
 	sqlDB.SetConnMaxLifetime(5 * time.Minute) // Shorter lifetime for better load balancing
 	sqlDB.SetConnMaxIdleTime(2 * time.Minute) // Shorter idle time for resource efficiency
 
-	if err := DB.AutoMigrate(&models.User{}, &models.Agent{}, &models.AgentMessage{}, &models.LLMUsage{}, &models.Character{}, &models.AgentState{}, &models.ActionExecution{}, &models.Reminder{}, &models.Observable{}, &models.H402PendingRequests{}); err != nil {
+	if err := DB.AutoMigrate(&models.User{}, &models.Agent{}, &models.AgentMessage{}, &models.LLMUsage{}, &models.Character{}, &models.AgentState{}, &models.ActionExecution{}, &models.Reminder{}, &models.Observable{}, &models.H402PendingRequests{}, &models.OAuth{}); err != nil {
 		log.Fatal("Migration failed:", err)
 	}
 

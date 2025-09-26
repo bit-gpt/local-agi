@@ -352,7 +352,7 @@ func (a *App) Create() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, err.Error())
 		}
 
-		if err := validateAgentConfig(&config); err != nil {
+		if err := validateAgentConfig(&config, &userIDStr); err != nil {
 			return errorJSONMessageWithValidation(c, err)
 		}
 
@@ -622,7 +622,7 @@ func (a *App) UpdateAgentConfig() func(c *fiber.Ctx) error {
 			return errorJSONMessage(c, "Invalid agent config: "+err.Error())
 		}
 
-		if err := validateAgentConfig(&newConfig); err != nil {
+		if err := validateAgentConfig(&newConfig, &userIDStr); err != nil {
 			return errorJSONMessageWithValidation(c, err)
 		}
 
@@ -840,7 +840,7 @@ func (a *App) ImportAgent() func(c *fiber.Ctx) error {
 		xlog.Info("Importing agent", "name", config.Name)
 
 		// 5. Validate config fields
-		if err := validateAgentConfig(&config); err != nil {
+		if err := validateAgentConfig(&config, nil); err != nil {
 			return errorJSONMessageWithValidation(c, err)
 		}
 
@@ -1642,7 +1642,7 @@ func (a *App) CreateGroup() func(c *fiber.Ctx) error {
 			agentConfig.SystemPrompt = agent.SystemPrompt
 
 			// 3. Validate config fields
-			if err := validateAgentConfig(agentConfig); err != nil {
+			if err := validateAgentConfig(agentConfig, &userIDStr); err != nil {
 				return errorJSONMessageWithValidation(c, err)
 			}
 
@@ -1791,6 +1791,7 @@ func getOpenRouterModels() []map[string]interface{} {
 	}
 	// Only allow latest OpenAI, Anthropic, and Alibaba models
 	allowed := map[string]bool{
+		"openai/gpt-5":                         true,
 		"openai/gpt-4o":                        true,
 		"openai/gpt-4-turbo":                   true,
 		"openai/gpt-4.1":                       true,
@@ -1908,7 +1909,7 @@ func validatePayLimits(payLimits map[string]float64) error {
 }
 
 // validateAgentConfig validates all agent configuration fields
-func validateAgentConfig(config *state.AgentConfig) error {
+func validateAgentConfig(config *state.AgentConfig, userIDStr *string) error {
 	// Name validation
 	if config.Name == "" {
 		return NewValidationErrorWithSection("name is required", "basic-section")
@@ -2077,6 +2078,15 @@ func validateAgentConfig(config *state.AgentConfig) error {
 		// Validate action type exists
 		if !validActionTypes[action.Name] {
 			return NewValidationErrorWithSection(fmt.Sprintf("action %d: invalid action type '%s'", i+1, action.Name), "actions-section")
+		}
+
+		if userIDStr != nil && strings.Contains(strings.ToLower(action.Name), "gmail") {
+			fmt.Println("userIDStr", userIDStr)
+			var oauth models.OAuth
+			err := db.DB.Where("UserID = ? AND Platform = ? AND IsActive = ?", userIDStr, models.PlatformGmail, true).First(&oauth).Error
+			if err != nil {
+				return NewValidationErrorWithSection(fmt.Sprintf("action %d (%s): Gmail is not connected. Please connect your Gmail account first.", i+1, action.Name), "actions-section")
+			}
 		}
 
 		// Parse and validate action config JSON
