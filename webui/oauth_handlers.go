@@ -4,42 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/mudler/LocalAGI/db"
 	models "github.com/mudler/LocalAGI/dbmodels"
+	"github.com/mudler/LocalAGI/pkg/oauth"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 	"google.golang.org/api/gmail/v1"
+	googleoauth2 "google.golang.org/api/oauth2/v2"
 	"google.golang.org/api/option"
 )
 
 // Platform-specific OAuth configurations
 func getPlatformOAuthConfig(platform string) (*oauth2.Config, error) {
-	switch platform {
-	case models.PlatformGmail:
-		return &oauth2.Config{
-			ClientID:     os.Getenv("GMAIL_CLIENT_ID"),
-			ClientSecret: os.Getenv("GMAIL_CLIENT_SECRET"),
-			RedirectURL:  os.Getenv("GMAIL_REDIRECT_URL"),
-			Scopes: []string{
-				gmail.GmailSendScope,
-				gmail.GmailComposeScope,
-				gmail.GmailModifyScope,
-				gmail.GmailReadonlyScope,
-				gmail.GmailLabelsScope,
-			},
-			Endpoint: google.Endpoint,
-		}, nil
-	case models.PlatformGithub:
-		// TODO: Add GitHub OAuth config
-		return nil, fmt.Errorf("GitHub OAuth not yet implemented")
-	default:
-		return nil, fmt.Errorf("unsupported platform: %s", platform)
-	}
+	return oauth.GetOAuthConfig(platform)
 }
 
 // Platform-specific profile fetching
@@ -60,6 +40,19 @@ func getPlatformProfile(platform string, config *oauth2.Config, token *oauth2.To
 		}
 
 		return profile.EmailAddress, nil, nil
+
+	case models.PlatformGoogleCalendar:
+		oauth2Service, err := googleoauth2.NewService(context.Background(), option.WithHTTPClient(client))
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to create OAuth2 service: %v", err)
+		}
+
+		userInfo, err := oauth2Service.Userinfo.Get().Do()
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to get user info: %v", err)
+		}
+
+		return userInfo.Email, nil, nil
 
 	case models.PlatformGithub:
 		// TODO: Implement GitHub profile fetching
@@ -145,6 +138,8 @@ func (a *App) HandleOAuthCallback() func(c *fiber.Ctx) error {
 		// 3. Validate state parameter
 		stateParts := strings.Split(state, ":")
 		userIDStr := stateParts[0]
+
+		fmt.Println("stateParts", stateParts)
 
 		if len(stateParts) != 3 || stateParts[1] != platform {
 			return a.renderCloseWindow(c, platform, false, "Invalid state parameter", "")

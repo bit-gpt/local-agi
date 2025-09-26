@@ -4124,6 +4124,7 @@ a {
   border: 1px solid transparent;
   transition: background-color 0.2s ease;
   width: max-content;
+  min-width: 7.2rem;
 }
 
 .connect-btn:hover:not(:disabled) {

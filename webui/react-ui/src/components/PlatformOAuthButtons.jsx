@@ -178,7 +178,7 @@ const PlatformOAuthButtons = ({ actions, onOAuthChange }) => {
                       disabled={isLoading}
                       className="connect-btn"
                     >
-                      {isLoading ? "Connecting..." : `Connect ${info?.name}`}
+                      {isLoading ? "Connecting..." : `Connect`}
                     </button>
                   </div>
                 )}

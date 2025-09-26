@@ -62,6 +62,8 @@ const (
 	ActionGmailListLabels                = "gmail-list-labels"
 	ActionGmailAddLabelToEmail           = "gmail-add-label-to-email"
 	ActionGmailRemoveLabelFromEmail      = "gmail-remove-label-from-email"
+	ActionGoogleCalendarListCalendars    = "google-calendar-list-calendars"
+	ActionGoogleCalendarListEvents       = "google-calendar-list-events"
 )
 
 var AvailableActions = []string{
@@ -109,6 +111,8 @@ var AvailableActions = []string{
 	ActionGmailListLabels,
 	ActionGmailAddLabelToEmail,
 	ActionGmailRemoveLabelFromEmail,
+	ActionGoogleCalendarListCalendars,
+	ActionGoogleCalendarListEvents,
 }
 
 const (
@@ -301,6 +305,10 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGmailAddLabelToEmail(config)
 	case ActionGmailRemoveLabelFromEmail:
 		a = actions.NewGmailRemoveLabelFromEmail(config)
+	case ActionGoogleCalendarListCalendars:
+		a = actions.NewGoogleCalendarListCalendars(config)
+	case ActionGoogleCalendarListEvents:
+		a = actions.NewGoogleCalendarListEvents(config)
 	default:
 		xlog.Error("Action not found", "name", name)
 		return nil, fmt.Errorf("Action not found")
@@ -534,6 +542,16 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "gmail-remove-label-from-email",
 			Label:  "Gmail Remove Label From Email",
 			Fields: actions.GmailRemoveLabelFromEmailConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-list-calendars",
+			Label:  "Google Calendar List Calendars",
+			Fields: actions.GoogleCalendarListCalendarsConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-list-events",
+			Label:  "Google Calendar List Events",
+			Fields: actions.GoogleCalendarListEventsConfigMeta(),
 		},
 	}
 }

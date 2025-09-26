@@ -3,6 +3,11 @@ export const PLATFORM_INFO = {
     name: 'Gmail',
     icon: '/app/logos/gmail-logo.svg',
     color: '#EA4335',
+  },
+  ["google-calendar"]: {
+    name: 'Google Calendar',
+    icon: '/app/logos/google-calendar-logo.svg',
+    color: '#4285F4',
   }
 };
 
@@ -14,7 +19,7 @@ export const PLATFORM_INFO = {
  */
 export function extractRequiredPlatforms(actions) {
 
-  const targetPrefixes = ['gmail'];
+  const targetPrefixes = ['gmail', 'google-calendar'];
   const result = targetPrefixes.filter(prefix => 
     actions.some(action => action.name.startsWith(prefix + '-'))
   );

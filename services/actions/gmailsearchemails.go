@@ -9,7 +9,7 @@ import (
 
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
-	"github.com/mudler/LocalAGI/pkg/gmail"
+	"github.com/mudler/LocalAGI/pkg/oauth"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
@@ -53,7 +53,7 @@ func (a *GmailSearchEmailsAction) Run(ctx context.Context, sharedState *types.Ag
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	gmailService, err := gmail.GetGmailClient(sharedState.UserID)
+	gmailService, err := oauth.GetGmailClient(sharedState.UserID)
 	if err != nil {
 		return types.ActionResult{}, fmt.Errorf("failed to get Gmail client: %v", err)
 	}

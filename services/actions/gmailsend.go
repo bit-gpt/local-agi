@@ -16,7 +16,7 @@ import (
 
 	"github.com/mudler/LocalAGI/core/types"
 	"github.com/mudler/LocalAGI/pkg/config"
-	"github.com/mudler/LocalAGI/pkg/gmail"
+	"github.com/mudler/LocalAGI/pkg/oauth"
 	"github.com/sashabaranov/go-openai/jsonschema"
 	gmailapi "google.golang.org/api/gmail/v1"
 )
@@ -75,7 +75,7 @@ func (a *GmailSendEmailAction) Run(ctx context.Context, sharedState *types.Agent
 		return types.ActionResult{}, fmt.Errorf("attachment validation failed: %v", err)
 	}
 
-	gmailService, err := gmail.GetGmailClient(sharedState.UserID)
+	gmailService, err := oauth.GetGmailClient(sharedState.UserID)
 	if err != nil {
 		return types.ActionResult{}, fmt.Errorf("failed to get Gmail client: %v", err)
 	}

@@ -107,9 +107,10 @@ Choose the most appropriate single tool call to fulfill the user's complete requ
 	}
 
 	decision := openai.ChatCompletionRequest{
-		Model:    a.options.LLMAPI.Model,
-		Messages: enhancedConversation,
-		Tools:    tools,
+		Model:             a.options.LLMAPI.Model,
+		Messages:          enhancedConversation,
+		Tools:             tools,
+		ParallelToolCalls: false,
 	}
 
 	if choice != nil {
