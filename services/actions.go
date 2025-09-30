@@ -64,6 +64,9 @@ const (
 	ActionGmailRemoveLabelFromEmail      = "gmail-remove-label-from-email"
 	ActionGoogleCalendarListCalendars    = "google-calendar-list-calendars"
 	ActionGoogleCalendarListEvents       = "google-calendar-list-events"
+	ActionGoogleCalendarCreateEvent      = "google-calendar-create-event"
+	ActionGoogleCalendarUpdateEvent      = "google-calendar-update-event"
+	ActionGoogleCalendarGetEvent         = "google-calendar-get-event"
 )
 
 var AvailableActions = []string{
@@ -113,6 +116,9 @@ var AvailableActions = []string{
 	ActionGmailRemoveLabelFromEmail,
 	ActionGoogleCalendarListCalendars,
 	ActionGoogleCalendarListEvents,
+	ActionGoogleCalendarCreateEvent,
+	ActionGoogleCalendarUpdateEvent,
+	ActionGoogleCalendarGetEvent,
 }
 
 const (
@@ -309,6 +315,12 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGoogleCalendarListCalendars(config)
 	case ActionGoogleCalendarListEvents:
 		a = actions.NewGoogleCalendarListEvents(config)
+	case ActionGoogleCalendarCreateEvent:
+		a = actions.NewGoogleCalendarCreateEvent(config)
+	case ActionGoogleCalendarUpdateEvent:
+		a = actions.NewGoogleCalendarUpdateEvent(config)
+	case ActionGoogleCalendarGetEvent:
+		a = actions.NewGoogleCalendarGetEvent(config)
 	default:
 		xlog.Error("Action not found", "name", name)
 		return nil, fmt.Errorf("Action not found")
@@ -552,6 +564,21 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "google-calendar-list-events",
 			Label:  "Google Calendar List Events",
 			Fields: actions.GoogleCalendarListEventsConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-create-event",
+			Label:  "Google Calendar Create Event",
+			Fields: actions.GoogleCalendarCreateEventConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-update-event",
+			Label:  "Google Calendar Update Event",
+			Fields: actions.GoogleCalendarUpdateEventConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-get-event",
+			Label:  "Google Calendar Get Event",
+			Fields: actions.GoogleCalendarGetEventConfigMeta(),
 		},
 	}
 }

@@ -1295,6 +1295,12 @@ CRITICAL GMAIL SEARCH RESULT FORMATTING RULES:
 	1. Do NOT omit the Message ID if present - it's crucial for email identification and future reference
 	`
 
+	googleCalendarFormattingRules := `
+	CRITICAL GOOGLE CALENDAR EVENT FORMATTING RULES:
+	1. When displaying Google Calendar events, ALWAYS include Calendar ID and Event ID if present.
+	2. Do NOT omit the Calendar ID and Event ID - it's crucial for calendar and event identification and future reference
+	`
+
 	// Check if we just executed an email action to adjust formatting
 	var forceResponsePrompt string
 	if len(conv) > 0 {
@@ -1303,6 +1309,7 @@ CRITICAL GMAIL SEARCH RESULT FORMATTING RULES:
 		hasGmailSearchAction := false
 		hasGmailAction := false
 		hasGmailSendAction := false
+		hasGoogleCalendarAction := false
 		for i := len(conv) - 1; i >= 0 && i >= len(conv)-3; i-- { // Check last 3 messages
 			if conv[i].Role == "tool" {
 				if strings.Contains(conv[i].Name, "send_email") {
@@ -1321,6 +1328,10 @@ CRITICAL GMAIL SEARCH RESULT FORMATTING RULES:
 					hasGmailAction = true
 					break
 				}
+				if strings.Contains(conv[i].Name, "google-calendar") {
+					hasGoogleCalendarAction = true
+					break
+				}
 			}
 		}
 
@@ -1332,6 +1343,8 @@ CRITICAL GMAIL SEARCH RESULT FORMATTING RULES:
 			forceResponsePrompt = basePrompt + gmailFormattingRules + emailFormattingRules
 		} else if hasGmailAction {
 			forceResponsePrompt = basePrompt + gmailFormattingRules
+		} else if hasGoogleCalendarAction {
+			forceResponsePrompt = basePrompt + googleCalendarFormattingRules
 		} else {
 			forceResponsePrompt = basePrompt + markdownFormattingRules
 		}

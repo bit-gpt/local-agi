@@ -19,19 +19,38 @@ func NewGoogleCalendarListEvents(config map[string]string) *GoogleCalendarListEv
 type GoogleCalendarListEventsAction struct{}
 
 type Event struct {
-	ID          string     `json:"id"`
-	Summary     string     `json:"summary"`
-	Description string     `json:"description,omitempty"`
-	Location    string     `json:"location,omitempty"`
-	Start       *EventTime `json:"start"`
-	End         *EventTime `json:"end"`
-	Status      string     `json:"status"`
-	HtmlLink    string     `json:"htmlLink"`
-	Attendees   []Attendee `json:"attendees,omitempty"`
-	Creator     *Person    `json:"creator,omitempty"`
-	Organizer   *Person    `json:"organizer,omitempty"`
-	Recurrence  []string   `json:"recurrence,omitempty"`
-	Visibility  string     `json:"visibility,omitempty"`
+	ID                      string               `json:"id"`
+	Summary                 string               `json:"summary"`
+	Description             string               `json:"description,omitempty"`
+	Location                string               `json:"location,omitempty"`
+	Start                   *EventTime           `json:"start"`
+	End                     *EventTime           `json:"end"`
+	Status                  string               `json:"status"`
+	HtmlLink                string               `json:"htmlLink"`
+	Attendees               []Attendee           `json:"attendees,omitempty"`
+	Creator                 *Person              `json:"creator,omitempty"`
+	Organizer               *Person              `json:"organizer,omitempty"`
+	Recurrence              []string             `json:"recurrence,omitempty"`
+	Visibility              string               `json:"visibility,omitempty"`
+	ColorId                 string               `json:"colorId,omitempty"`
+	Transparency            string               `json:"transparency,omitempty"`
+	Created                 string               `json:"created,omitempty"`
+	Updated                 string               `json:"updated,omitempty"`
+	RecurringEventId        string               `json:"recurringEventId,omitempty"`
+	OriginalStartTime       *EventTime           `json:"originalStartTime,omitempty"`
+	ICalUID                 string               `json:"iCalUID,omitempty"`
+	Sequence                int64                `json:"sequence,omitempty"`
+	HangoutLink             string               `json:"hangoutLink,omitempty"`
+	AnyoneCanAddSelf        bool                 `json:"anyoneCanAddSelf,omitempty"`
+	GuestsCanInviteOthers   bool                 `json:"guestsCanInviteOthers,omitempty"`
+	GuestsCanModify         bool                 `json:"guestsCanModify,omitempty"`
+	GuestsCanSeeOtherGuests bool                 `json:"guestsCanSeeOtherGuests,omitempty"`
+	PrivateCopy             bool                 `json:"privateCopy,omitempty"`
+	Locked                  bool                 `json:"locked,omitempty"`
+	EventType               string               `json:"eventType,omitempty"`
+	ConferenceData          *ConferenceData      `json:"conferenceData,omitempty"`
+	Attachments             []CalendarAttachment `json:"attachments,omitempty"`
+	Source                  *EventSource         `json:"source,omitempty"`
 }
 
 type EventTime struct {
@@ -52,6 +71,46 @@ type Person struct {
 	DisplayName string `json:"displayName,omitempty"`
 }
 
+type ConferenceData struct {
+	CreateRequest      *CreateRequest      `json:"createRequest,omitempty"`
+	EntryPoints        []EntryPoint        `json:"entryPoints,omitempty"`
+	ConferenceSolution *ConferenceSolution `json:"conferenceSolution,omitempty"`
+	ConferenceId       string              `json:"conferenceId,omitempty"`
+	Signature          string              `json:"signature,omitempty"`
+	Notes              string              `json:"notes,omitempty"`
+}
+
+type CreateRequest struct {
+	RequestId             string                 `json:"requestId,omitempty"`
+	ConferenceSolutionKey *ConferenceSolutionKey `json:"conferenceSolutionKey,omitempty"`
+}
+
+type ConferenceSolutionKey struct {
+	Type string `json:"type,omitempty"`
+}
+
+type EntryPoint struct {
+	EntryPointType string `json:"entryPointType,omitempty"`
+	Uri            string `json:"uri,omitempty"`
+	Label          string `json:"label,omitempty"`
+	Pin            string `json:"pin,omitempty"`
+	AccessCode     string `json:"accessCode,omitempty"`
+	MeetingCode    string `json:"meetingCode,omitempty"`
+	Passcode       string `json:"passcode,omitempty"`
+	Password       string `json:"password,omitempty"`
+}
+
+type ConferenceSolution struct {
+	Key     *ConferenceSolutionKey `json:"key,omitempty"`
+	Name    string                 `json:"name,omitempty"`
+	IconUri string                 `json:"iconUri,omitempty"`
+}
+
+type EventSource struct {
+	Title string `json:"title,omitempty"`
+	Url   string `json:"url,omitempty"`
+}
+
 // formatTimeForAPI converts time strings to RFC3339 format required by Google Calendar API
 func formatTimeForAPI(timeStr, timeZone string) (string, error) {
 	if timeStr == "" {
@@ -59,15 +118,25 @@ func formatTimeForAPI(timeStr, timeZone string) (string, error) {
 	}
 
 	// If already in RFC3339 format (has timezone), return as-is
-	if strings.Contains(timeStr, "Z") || strings.Contains(timeStr, "+") || strings.Contains(timeStr, "-") && len(timeStr) > 19 {
+	if strings.Contains(timeStr, "Z") || strings.Contains(timeStr, "+") ||
+		(strings.Contains(timeStr, "-") && len(timeStr) > 19) {
 		return timeStr, nil
 	}
 
-	// Parse the time string
-	var t time.Time
+	// Determine location
+	var loc *time.Location
 	var err error
+	if timeZone != "" {
+		loc, err = time.LoadLocation(timeZone)
+		if err != nil {
+			return "", fmt.Errorf("invalid timezone '%s': %v", timeZone, err)
+		}
+	} else {
+		loc = time.UTC
+	}
 
-	// Try parsing common formats
+	// Try parsing common formats in the specified location
+	var t time.Time
 	formats := []string{
 		"2006-01-02T15:04:05",
 		"2006-01-02T15:04:05.000",
@@ -76,7 +145,7 @@ func formatTimeForAPI(timeStr, timeZone string) (string, error) {
 	}
 
 	for _, format := range formats {
-		t, err = time.Parse(format, timeStr)
+		t, err = time.ParseInLocation(format, timeStr, loc)
 		if err == nil {
 			break
 		}
@@ -84,19 +153,6 @@ func formatTimeForAPI(timeStr, timeZone string) (string, error) {
 
 	if err != nil {
 		return "", fmt.Errorf("unable to parse time '%s': %v", timeStr, err)
-	}
-
-	// If we have a timezone, apply it
-	if timeZone != "" {
-		loc, err := time.LoadLocation(timeZone)
-		if err != nil {
-			return "", fmt.Errorf("invalid timezone '%s': %v", timeZone, err)
-		}
-		// Interpret the parsed time in the specified timezone
-		t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), loc)
-	} else {
-		// Default to UTC if no timezone specified
-		t = t.UTC()
 	}
 
 	return t.Format(time.RFC3339), nil
@@ -121,6 +177,15 @@ func (a *GoogleCalendarListEventsAction) Run(ctx context.Context, sharedState *t
 	timeMin, _ := params["timeMin"].(string)
 	timeMax, _ := params["timeMax"].(string)
 	timeZone, _ := params["timeZone"].(string)
+
+	if timeZone == "" {
+		calendarTZ, err := getCalendarTimezone(ctx, calendarService, calendarID)
+		if err == nil && calendarTZ != "" {
+			timeZone = calendarTZ
+		} else {
+			timeZone = "UTC"
+		}
+	}
 
 	// Format time parameters for API
 	formattedTimeMin, err := formatTimeForAPI(timeMin, timeZone)
@@ -199,9 +264,15 @@ func (a *GoogleCalendarListEventsAction) Run(ctx context.Context, sharedState *t
 		}, nil
 	}
 
+	// Limit to first 20 events if more than 20 are found
+	eventsToProcess := eventsResponse.Items
+	if len(eventsResponse.Items) > 20 {
+		eventsToProcess = eventsResponse.Items[:20]
+	}
+
 	// Convert to our struct format
 	var events []Event
-	for _, event := range eventsResponse.Items {
+	for _, event := range eventsToProcess {
 		convertedEvent := Event{
 			ID:          event.Id,
 			Summary:     event.Summary,
@@ -214,8 +285,18 @@ func (a *GoogleCalendarListEventsAction) Run(ctx context.Context, sharedState *t
 
 		// Convert start time
 		if event.Start != nil {
+			normalizedStartTime := event.Start.DateTime
+			if normalizedStartTime != "" && event.Start.TimeZone != "" {
+				var err error
+				normalizedStartTime, err = normalizeEventTime(event.Start.DateTime, event.Start.TimeZone)
+				if err != nil {
+					fmt.Printf("Warning: failed to normalize start time for event %s: %v\n", event.Id, err)
+					normalizedStartTime = event.Start.DateTime
+				}
+			}
+
 			convertedEvent.Start = &EventTime{
-				DateTime: event.Start.DateTime,
+				DateTime: normalizedStartTime,
 				Date:     event.Start.Date,
 				TimeZone: event.Start.TimeZone,
 			}
@@ -223,8 +304,18 @@ func (a *GoogleCalendarListEventsAction) Run(ctx context.Context, sharedState *t
 
 		// Convert end time
 		if event.End != nil {
+			normalizedEndTime := event.End.DateTime
+			if normalizedEndTime != "" && event.End.TimeZone != "" {
+				var err error
+				normalizedEndTime, err = normalizeEventTime(event.End.DateTime, event.End.TimeZone)
+				if err != nil {
+					fmt.Printf("Warning: failed to normalize end time for event %s: %v\n", event.Id, err)
+					normalizedEndTime = event.End.DateTime
+				}
+			}
+
 			convertedEvent.End = &EventTime{
-				DateTime: event.End.DateTime,
+				DateTime: normalizedEndTime,
 				Date:     event.End.Date,
 				TimeZone: event.End.TimeZone,
 			}
@@ -397,6 +488,108 @@ func formatEventDetails(event Event, index int) string {
 
 	if event.HtmlLink != "" {
 		details.WriteString(fmt.Sprintf("   Link: %s\n", event.HtmlLink))
+	}
+
+	// Additional optional fields
+	if event.ColorId != "" {
+		details.WriteString(fmt.Sprintf("   Color ID: %s\n", event.ColorId))
+	}
+
+	if event.Transparency != "" {
+		details.WriteString(fmt.Sprintf("   Transparency: %s\n", event.Transparency))
+	}
+
+	if event.Created != "" {
+		details.WriteString(fmt.Sprintf("   Created: %s\n", event.Created))
+	}
+
+	if event.Updated != "" {
+		details.WriteString(fmt.Sprintf("   Updated: %s\n", event.Updated))
+	}
+
+	if event.RecurringEventId != "" {
+		details.WriteString(fmt.Sprintf("   Recurring Event ID: %s\n", event.RecurringEventId))
+	}
+
+	if event.OriginalStartTime != nil {
+		if event.OriginalStartTime.DateTime != "" {
+			details.WriteString(fmt.Sprintf("   Original Start: %s", event.OriginalStartTime.DateTime))
+			if event.OriginalStartTime.TimeZone != "" {
+				details.WriteString(fmt.Sprintf(" (%s)", event.OriginalStartTime.TimeZone))
+			}
+			details.WriteString("\n")
+		} else if event.OriginalStartTime.Date != "" {
+			details.WriteString(fmt.Sprintf("   Original Start Date: %s\n", event.OriginalStartTime.Date))
+		}
+	}
+
+	if event.ICalUID != "" {
+		details.WriteString(fmt.Sprintf("   iCal UID: %s\n", event.ICalUID))
+	}
+
+	if event.Sequence != 0 {
+		details.WriteString(fmt.Sprintf("   Sequence: %d\n", event.Sequence))
+	}
+
+	if event.HangoutLink != "" {
+		details.WriteString(fmt.Sprintf("   Hangout Link: %s\n", event.HangoutLink))
+	}
+
+	if event.EventType != "" {
+		details.WriteString(fmt.Sprintf("   Event Type: %s\n", event.EventType))
+	}
+
+	// Guest permissions
+	guestPermissions := []string{}
+	if event.AnyoneCanAddSelf {
+		guestPermissions = append(guestPermissions, "Anyone can add self")
+	}
+	if event.GuestsCanInviteOthers {
+		guestPermissions = append(guestPermissions, "Guests can invite others")
+	}
+	if event.GuestsCanModify {
+		guestPermissions = append(guestPermissions, "Guests can modify")
+	}
+	if event.GuestsCanSeeOtherGuests {
+		guestPermissions = append(guestPermissions, "Guests can see other guests")
+	}
+	if event.PrivateCopy {
+		guestPermissions = append(guestPermissions, "Private copy")
+	}
+	if event.Locked {
+		guestPermissions = append(guestPermissions, "Locked")
+	}
+
+	if len(guestPermissions) > 0 {
+		details.WriteString(fmt.Sprintf("   Guest Permissions: %s\n", strings.Join(guestPermissions, ", ")))
+	}
+
+	if event.ConferenceData != nil {
+		details.WriteString(fmt.Sprintf("   Conference Data: %s\n", event.ConferenceData.ConferenceId))
+		details.WriteString(fmt.Sprintf("     - %s\n", event.ConferenceData.Signature))
+		details.WriteString(fmt.Sprintf("     - %s\n", event.ConferenceData.Notes))
+		if event.ConferenceData.CreateRequest != nil {
+			details.WriteString(fmt.Sprintf("     - Create Request: %s\n", event.ConferenceData.CreateRequest.RequestId))
+		}
+		if event.ConferenceData.ConferenceSolution != nil {
+			details.WriteString(fmt.Sprintf("     - Conference Solution: %s\n", event.ConferenceData.ConferenceSolution.Name))
+		}
+	}
+
+	if len(event.Attachments) > 0 {
+		details.WriteString("   Attachments:\n")
+		for _, attachment := range event.Attachments {
+			details.WriteString(fmt.Sprintf("     - %s\n", attachment.FileId))
+			details.WriteString(fmt.Sprintf("     - %s\n", attachment.FileUrl))
+			details.WriteString(fmt.Sprintf("     - %s\n", attachment.Title))
+			details.WriteString(fmt.Sprintf("     - %s\n", attachment.MimeType))
+			details.WriteString(fmt.Sprintf("     - %s\n", attachment.IconLink))
+		}
+	}
+
+	if event.Source != nil {
+		details.WriteString(fmt.Sprintf("   Source: %s\n", event.Source.Title))
+		details.WriteString(fmt.Sprintf("     - %s\n", event.Source.Url))
 	}
 
 	return details.String()

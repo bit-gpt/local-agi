@@ -141,6 +141,9 @@ function Chat() {
           if (actionName.includes("gmail-remove-label-from-email")) return "Removing label from email";
           if (actionName.includes("google-calendar-list-calendars")) return "Listing calendars";
           if (actionName.includes("google-calendar-list-events")) return "Listing events";
+          if (actionName.includes("google-calendar-create-event")) return "Creating event";
+          if (actionName.includes("google-calendar-update-event")) return "Updating event";
+          if (actionName.includes("google-calendar-get-event")) return "Getting event";
           return `Running ${actionName}`;
         }
         return "Taking action";
