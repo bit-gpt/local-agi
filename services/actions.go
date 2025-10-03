@@ -67,6 +67,9 @@ const (
 	ActionGoogleCalendarCreateEvent      = "google-calendar-create-event"
 	ActionGoogleCalendarUpdateEvent      = "google-calendar-update-event"
 	ActionGoogleCalendarGetEvent         = "google-calendar-get-event"
+	ActionGoogleCalendarDeleteEvent      = "google-calendar-delete-event"
+	ActionGoogleCalendarListColors       = "google-calendar-list-colors"
+	ActionGoogleCalendarGetFreeBusy      = "google-calendar-get-free-busy"
 )
 
 var AvailableActions = []string{
@@ -119,6 +122,9 @@ var AvailableActions = []string{
 	ActionGoogleCalendarCreateEvent,
 	ActionGoogleCalendarUpdateEvent,
 	ActionGoogleCalendarGetEvent,
+	ActionGoogleCalendarDeleteEvent,
+	ActionGoogleCalendarListColors,
+	ActionGoogleCalendarGetFreeBusy,
 }
 
 const (
@@ -321,6 +327,12 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGoogleCalendarUpdateEvent(config)
 	case ActionGoogleCalendarGetEvent:
 		a = actions.NewGoogleCalendarGetEvent(config)
+	case ActionGoogleCalendarDeleteEvent:
+		a = actions.NewGoogleCalendarDeleteEvent(config)
+	case ActionGoogleCalendarListColors:
+		a = actions.NewGoogleCalendarListColors(config)
+	case ActionGoogleCalendarGetFreeBusy:
+		a = actions.NewGoogleCalendarGetFreeBusy(config)
 	default:
 		xlog.Error("Action not found", "name", name)
 		return nil, fmt.Errorf("Action not found")
@@ -579,6 +591,21 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "google-calendar-get-event",
 			Label:  "Google Calendar Get Event",
 			Fields: actions.GoogleCalendarGetEventConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-delete-event",
+			Label:  "Google Calendar Delete Event",
+			Fields: actions.GoogleCalendarDeleteEventConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-list-colors",
+			Label:  "Google Calendar List Colors",
+			Fields: actions.GoogleCalendarListColorsConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-get-free-busy",
+			Label:  "Google Calendar Get Free Busy",
+			Fields: actions.GoogleCalendarGetFreeBusyConfigMeta(),
 		},
 	}
 }

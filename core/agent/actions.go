@@ -233,7 +233,7 @@ Choose the most appropriate single tool call to fulfill the user's complete requ
 		}
 
 		msg := resp.Choices[0].Message
-		if len(msg.ToolCalls) != 1 {
+		if len(msg.ToolCalls) == 0 {
 			if err := a.saveConversation(append(conversation, msg), "decision"); err != nil {
 				xlog.Error("Error saving conversation", "error", err)
 			}
@@ -257,6 +257,28 @@ Choose the most appropriate single tool call to fulfill the user's complete requ
 			}
 
 			continue
+		}
+
+		// If there are multiple tool calls, add them to the conversation for sequential processing
+		if len(msg.ToolCalls) > 1 {
+			// Limit to 10 tool calls total to prevent infinite loops
+			maxToolCalls := 10
+			if len(msg.ToolCalls) > maxToolCalls {
+				xlog.Warn("Too many tool calls, ignoring excess", "total", len(msg.ToolCalls), "limit", maxToolCalls)
+				return &decisionResult{message: msg.Content}, nil
+			}
+
+			xlog.Info("Multiple tool calls detected, will process sequentially", "count", len(msg.ToolCalls))
+			// Store the remaining tool calls as additional assistant messages in the conversation
+			// This will allow the natural agent loop to pick them up one by one
+			remainingCalls := msg.ToolCalls[1:]
+			for _, toolCall := range remainingCalls {
+				remainingMsg := openai.ChatCompletionMessage{
+					Role:      "assistant",
+					ToolCalls: []openai.ToolCall{toolCall},
+				}
+				conversation = append(conversation, remainingMsg)
+			}
 		}
 
 		if err := a.saveConversation(append(conversation, msg), "decision"); err != nil {

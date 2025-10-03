@@ -144,6 +144,9 @@ function Chat() {
           if (actionName.includes("google-calendar-create-event")) return "Creating event";
           if (actionName.includes("google-calendar-update-event")) return "Updating event";
           if (actionName.includes("google-calendar-get-event")) return "Getting event";
+          if (actionName.includes("google-calendar-delete-event")) return "Deleting event";
+          if (actionName.includes("google-calendar-list-colors")) return "Listing colors";
+          if (actionName.includes("google-calendar-get-freebusy")) return "Getting free busy time";
           return `Running ${actionName}`;
         }
         return "Taking action";
