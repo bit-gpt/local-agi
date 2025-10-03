@@ -159,7 +159,7 @@ func NewAgentConfigMeta(
 				Name:         "enable_kb",
 				Label:        "Enable Knowledge Base",
 				Type:         "checkbox",
-				DefaultValue: false,
+				DefaultValue: true,
 				Tags:         config.Tags{Section: "MemorySettings"},
 			},
 			{

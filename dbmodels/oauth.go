@@ -9,8 +9,9 @@ import (
 
 // OAuth platforms
 const (
-	PlatformGmail  = "gmail"
-	PlatformGithub = "github"
+	PlatformGmail          = "gmail"
+	PlatformGithub         = "github"
+	PlatformGoogleCalendar = "google-calendar"
 	// Add more platforms as needed
 )
 
@@ -55,4 +56,9 @@ func (o *OAuth) IsGmail() bool {
 // IsGithub checks if this OAuth is for GitHub platform
 func (o *OAuth) IsGithub() bool {
 	return o.Platform == PlatformGithub
+}
+
+// IsGoogleCalendar checks if this OAuth is for Google Calendar platform
+func (o *OAuth) IsGoogleCalendar() bool {
+	return o.Platform == PlatformGoogleCalendar
 }

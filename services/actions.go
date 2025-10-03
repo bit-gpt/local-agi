@@ -62,6 +62,14 @@ const (
 	ActionGmailListLabels                = "gmail-list-labels"
 	ActionGmailAddLabelToEmail           = "gmail-add-label-to-email"
 	ActionGmailRemoveLabelFromEmail      = "gmail-remove-label-from-email"
+	ActionGoogleCalendarListCalendars    = "google-calendar-list-calendars"
+	ActionGoogleCalendarListEvents       = "google-calendar-list-events"
+	ActionGoogleCalendarCreateEvent      = "google-calendar-create-event"
+	ActionGoogleCalendarUpdateEvent      = "google-calendar-update-event"
+	ActionGoogleCalendarGetEvent         = "google-calendar-get-event"
+	ActionGoogleCalendarDeleteEvent      = "google-calendar-delete-event"
+	ActionGoogleCalendarListColors       = "google-calendar-list-colors"
+	ActionGoogleCalendarGetFreeBusy      = "google-calendar-get-free-busy"
 )
 
 var AvailableActions = []string{
@@ -109,6 +117,14 @@ var AvailableActions = []string{
 	ActionGmailListLabels,
 	ActionGmailAddLabelToEmail,
 	ActionGmailRemoveLabelFromEmail,
+	ActionGoogleCalendarListCalendars,
+	ActionGoogleCalendarListEvents,
+	ActionGoogleCalendarCreateEvent,
+	ActionGoogleCalendarUpdateEvent,
+	ActionGoogleCalendarGetEvent,
+	ActionGoogleCalendarDeleteEvent,
+	ActionGoogleCalendarListColors,
+	ActionGoogleCalendarGetFreeBusy,
 }
 
 const (
@@ -301,6 +317,22 @@ func Action(name, agentName string, config map[string]string, pool *state.AgentP
 		a = actions.NewGmailAddLabelToEmail(config)
 	case ActionGmailRemoveLabelFromEmail:
 		a = actions.NewGmailRemoveLabelFromEmail(config)
+	case ActionGoogleCalendarListCalendars:
+		a = actions.NewGoogleCalendarListCalendars(config)
+	case ActionGoogleCalendarListEvents:
+		a = actions.NewGoogleCalendarListEvents(config)
+	case ActionGoogleCalendarCreateEvent:
+		a = actions.NewGoogleCalendarCreateEvent(config)
+	case ActionGoogleCalendarUpdateEvent:
+		a = actions.NewGoogleCalendarUpdateEvent(config)
+	case ActionGoogleCalendarGetEvent:
+		a = actions.NewGoogleCalendarGetEvent(config)
+	case ActionGoogleCalendarDeleteEvent:
+		a = actions.NewGoogleCalendarDeleteEvent(config)
+	case ActionGoogleCalendarListColors:
+		a = actions.NewGoogleCalendarListColors(config)
+	case ActionGoogleCalendarGetFreeBusy:
+		a = actions.NewGoogleCalendarGetFreeBusy(config)
 	default:
 		xlog.Error("Action not found", "name", name)
 		return nil, fmt.Errorf("Action not found")
@@ -534,6 +566,46 @@ func ActionsConfigMeta() []config.FieldGroup {
 			Name:   "gmail-remove-label-from-email",
 			Label:  "Gmail Remove Label From Email",
 			Fields: actions.GmailRemoveLabelFromEmailConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-list-calendars",
+			Label:  "Google Calendar List Calendars",
+			Fields: actions.GoogleCalendarListCalendarsConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-list-events",
+			Label:  "Google Calendar List Events",
+			Fields: actions.GoogleCalendarListEventsConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-create-event",
+			Label:  "Google Calendar Create Event",
+			Fields: actions.GoogleCalendarCreateEventConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-update-event",
+			Label:  "Google Calendar Update Event",
+			Fields: actions.GoogleCalendarUpdateEventConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-get-event",
+			Label:  "Google Calendar Get Event",
+			Fields: actions.GoogleCalendarGetEventConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-delete-event",
+			Label:  "Google Calendar Delete Event",
+			Fields: actions.GoogleCalendarDeleteEventConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-list-colors",
+			Label:  "Google Calendar List Colors",
+			Fields: actions.GoogleCalendarListColorsConfigMeta(),
+		},
+		{
+			Name:   "google-calendar-get-free-busy",
+			Label:  "Google Calendar Get Free Busy",
+			Fields: actions.GoogleCalendarGetFreeBusyConfigMeta(),
 		},
 	}
 }

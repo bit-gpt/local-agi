@@ -139,6 +139,14 @@ function Chat() {
           if (actionName.includes("gmail-list-labels")) return "Listing labels";
           if (actionName.includes("gmail-add-label-to-email")) return "Adding label to email";
           if (actionName.includes("gmail-remove-label-from-email")) return "Removing label from email";
+          if (actionName.includes("google-calendar-list-calendars")) return "Listing calendars";
+          if (actionName.includes("google-calendar-list-events")) return "Listing events";
+          if (actionName.includes("google-calendar-create-event")) return "Creating event";
+          if (actionName.includes("google-calendar-update-event")) return "Updating event";
+          if (actionName.includes("google-calendar-get-event")) return "Getting event";
+          if (actionName.includes("google-calendar-delete-event")) return "Deleting event";
+          if (actionName.includes("google-calendar-list-colors")) return "Listing colors";
+          if (actionName.includes("google-calendar-get-freebusy")) return "Getting free busy time";
           return `Running ${actionName}`;
         }
         return "Taking action";
