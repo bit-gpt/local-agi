@@ -1320,7 +1320,7 @@ CRITICAL GMAIL SEARCH RESULT FORMATTING RULES:
 					hasGmailSearchAction = true
 					break
 				}
-				if strings.Contains(conv[i].Name, "gmail-send-email") || strings.Contains(conv[i].Name, "gmail-create-draft-email") {
+				if strings.Contains(conv[i].Name, "gmail-send-email") || strings.Contains(conv[i].Name, "gmail-create-draft-email") || strings.Contains(conv[i].Name, "gmail-send-draft-email") {
 					hasGmailSendAction = true
 					break
 				}

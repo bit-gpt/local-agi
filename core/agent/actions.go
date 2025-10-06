@@ -92,7 +92,7 @@ SPECIAL FORMATTING RULES:
 Examples:
 - For "weather in Paris and Boston" → use one search like "current weather in Paris and Boston"
 - For "tell me about X and Y" → use one search like "information about X and Y"
-- For "email me the results at user@example.com" → send the email directly using send_email or gmail-send-email action (plain text only)
+- For "email me the results at" → send the email directly using send_email or gmail-send-email or gmail-send-draft-email action (plain text only)
 - For multiple related items → combine them into one comprehensive query
 - When users mention temporal references like "today", "this week", "recent", etc., use the current date and time provided above
 
@@ -104,6 +104,23 @@ Choose the most appropriate single tool call to fulfill the user's complete requ
 				Content: singleToolGuidance,
 			},
 		}, conversation...)
+	}
+
+	for _, tool := range tools {
+		if tool.Function.Name == "gmail-send-email" || tool.Function.Name == "gmail-send-draft-email" {
+			var oauthRecord models.OAuth
+			err := db.DB.Where("UserID = ? AND Platform = ? AND IsActive = ?", a.options.userID, "gmail", true).First(&oauthRecord).Error
+			if err != nil {
+				return nil, fmt.Errorf("no active %s OAuth found for user: %v", "gmail", err)
+			}
+			enhancedConversation = append([]openai.ChatCompletionMessage{
+				{
+					Role:    "system",
+					Content: fmt.Sprintf("If the user said to send email to own email address then here's the user's own email address: %s", oauthRecord.Email),
+				},
+			}, enhancedConversation...)
+			break
+		}
 	}
 
 	decision := openai.ChatCompletionRequest{
@@ -426,6 +443,7 @@ func (a *Agent) generateParameters(job *types.Job, pickTemplate string, act type
 	}
 
 	cc := conversation
+
 	if a.options.forceReasoning {
 		// First, get the LLM to reason about optimal parameter usage
 		parameterReasoningPrompt := fmt.Sprintf(parameterReasoningPrompt,
