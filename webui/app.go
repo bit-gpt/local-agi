@@ -441,7 +441,7 @@ func (a *App) GetTemplates() func(c *fiber.Ctx) error {
 				"name":        template.Name,
 				"description": template.Description,
 				"category":    template.Category,
-				"icon":        template.Icon,
+				"icons":       template.Icons,
 			})
 		}
 
@@ -2081,11 +2081,18 @@ func validateAgentConfig(config *state.AgentConfig, userIDStr *string) error {
 		}
 
 		if userIDStr != nil && strings.Contains(strings.ToLower(action.Name), "gmail") {
-			fmt.Println("userIDStr", userIDStr)
 			var oauth models.OAuth
 			err := db.DB.Where("UserID = ? AND Platform = ? AND IsActive = ?", userIDStr, models.PlatformGmail, true).First(&oauth).Error
 			if err != nil {
 				return NewValidationErrorWithSection(fmt.Sprintf("action %d (%s): Gmail is not connected. Please connect your Gmail account first.", i+1, action.Name), "actions-section")
+			}
+		}
+
+		if userIDStr != nil && strings.Contains(strings.ToLower(action.Name), "google-calendar") {
+			var oauth models.OAuth
+			err := db.DB.Where("UserID = ? AND Platform = ? AND IsActive = ?", userIDStr, models.PlatformGoogleCalendar, true).First(&oauth).Error
+			if err != nil {
+				return NewValidationErrorWithSection(fmt.Sprintf("action %d (%s): Google Calendar is not connected. Please connect your Google Calendar account first.", i+1, action.Name), "actions-section")
 			}
 		}
 

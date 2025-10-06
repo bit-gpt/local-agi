@@ -10,7 +10,7 @@ const scratchTemplate = {
   name: "Start from Scratch",
   description: "Create a custom agent with your own configuration",
   category: "scratch",
-  icon: "scratch",
+  icons: ["scratch"], 
 };
 
 const Templates = () => {
@@ -230,8 +230,12 @@ const Templates = () => {
                       data-template-id={template.id}
                       onClick={handleTemplateClick}
                     >
-                      <div className="template-icon">
-                        <img src={`/app/templates/${template.icon}.svg`} alt={template.name} />
+                      <div className="template-icons-container">
+                        {template.icons.map((icon) => (
+                          <div className="template-icon">
+                            <img src={`/app/templates/${icon}.svg`} alt={template.name} />
+                          </div>
+                        ))}
                       </div>
                       <div className="template-name">{template.name}</div>
                       <p className="template-description">
